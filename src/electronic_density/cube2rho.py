@@ -12,9 +12,9 @@ from .types import DensityFunction
 
 class CubeDict(TypedDict):
     atoms: Atoms
-    data: np.ndarray
-    origin: np.ndarray
-    spacing: np.ndarray
+    data: npt.NDArray[np.floating]
+    origin: npt.NDArray[np.floating]
+    spacing: npt.NDArray[np.floating]
 
 
 @dataclass
@@ -32,7 +32,6 @@ class PlaneWaveDensity:
     def __call__(self, r: npt.NDArray[np.floating]) -> npt.NDArray[np.floating] | np.floating:
         N = len(self.rho_g)
         r = np.asarray(r, dtype=float)
-        result = None
 
         if r.shape == (3,):
             result = np.sum(self.rho_g * np.exp(1j * (self.G @ r))) / N

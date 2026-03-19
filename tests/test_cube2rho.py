@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from electronic_density.cube2rho import load_rho_from_cube
+from electronic_density import cube2rho
 
 DATA_DIR = Path(__file__).parent / "data"
 CUBE_PATH = DATA_DIR / "nvp_rho.cube"
