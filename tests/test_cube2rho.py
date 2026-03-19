@@ -1,12 +1,9 @@
 """Tests for src/electronic_density/cube2rho.py."""
 
-import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from salted_espresso.src.electronic_density import cube2rho
 

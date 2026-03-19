@@ -26,7 +26,7 @@ class DensityFunction(Protocol):
      - Coordinates are expected in the same length units as used by the
        originating density source.
      """
-    def __call__(self, r: npt.NDArray[np.floating]) -> npt.ndarray[np.floating] | np.floating:
+    def __call__(self, r: npt.NDArray[np.floating]) -> npt.NDArray[np.floating] | np.floating:
         """
         Evaluate the electronic density at one or more Cartesian points.
 
