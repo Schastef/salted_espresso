@@ -3,8 +3,11 @@ from dataclasses import dataclass
 from typing import TypedDict
 
 import numpy as np
+import numpy.typing as npt
 from ase import Atoms
 from ase.io.cube import read_cube
+
+from .types import DensityFunction
 
 
 class CubeDict(TypedDict):
@@ -22,11 +25,11 @@ class RhoG:
 
 
 @dataclass
-class rho:
+class PlaneWaveDensity:
     rho_g: np.ndarray
     G: np.ndarray
 
-    def __call__(self, r: np.ndarray) -> np.ndarray:
+    def __call__(self, r: npt.NDArray[np.floating]) -> npt.NDArray[np.floating] | np.floating:
         N = len(self.rho_g)
         r = np.asarray(r, dtype=float)
         result = None
@@ -40,7 +43,7 @@ class rho:
         else:
             raise ValueError(f"r must have shape (3,) or (n, 3), got {r.shape}")
 
-        result = np.real_if_close(result, tol=1e-6)
+        result = np.real_if_close(result, tol=1000)
 
         if np.isreal(result).all():
             return result
@@ -60,7 +63,7 @@ def load_cubefile(path: Path) -> CubeDict:
     )
 
 
-def compute_rho_g(rho_r: np.ndarray, spacing: np.ndarray) -> RhoG:
+def compute_rho_g(rho_r: npt.NDArray[np.floating], spacing: npt.NDArray[np.floating]) -> RhoG:
     """
     Apply a fast Fourier transform to an electron density on a regular real-space grid
     to obtain rho_G and the corresponding reciprocal vectors G.
@@ -140,10 +143,11 @@ def compute_rho_g(rho_r: np.ndarray, spacing: np.ndarray) -> RhoG:
         grid_shape=grid_shape,
     )
 
-def load_rho_from_cube(path: Path) -> rho:
+
+def load_rho_from_cube(path: Path) -> DensityFunction:
     cube_dict = load_cubefile(path)
     rhog = compute_rho_g(cube_dict["data"], cube_dict["spacing"])
-    return rho(rhog.rho_g, rhog.G)
+    return PlaneWaveDensity(rhog.rho_g, rhog.G)
 
 
 
