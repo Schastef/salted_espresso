@@ -49,6 +49,10 @@ class PlaneWaveDensity:
         else:
             raise ValueError("Result is complex, but expected real. Check if G and rho_g are correct.")
 
+    def memory_usage_mb(self) -> float:
+        """Estimation of memory usage in megabytes to store the plane wave density data."""
+        return (self.rho_g.nbytes + self.G.nbytes) / (1024 * 1024)
+
 
 def load_cubefile(path: Path) -> CubeDict:
     with open(path, "r") as f:
