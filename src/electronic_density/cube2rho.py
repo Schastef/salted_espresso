@@ -42,7 +42,7 @@ class PlaneWaveDensity:
         else:
             raise ValueError(f"r must have shape (3,) or (n, 3), got {r.shape}")
 
-        result = np.real_if_close(result, tol=1000)
+        result = np.real_if_close(result, tol=1e-6)
 
         if np.isreal(result).all():
             return result

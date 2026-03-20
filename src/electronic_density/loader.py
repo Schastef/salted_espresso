@@ -2,10 +2,13 @@ from pathlib import Path
 
 from .cube2rho import load_rho_from_cube
 from .types import DensityFunction
+from typing import Callable, Dict
 
-LOADERS = {
-    ".cube": load_rho_from_cube,
-}
+LOADERS: Dict[str, Callable[..., DensityFunction]] = {}
+
+def register_loader(name: str, loader: Callable[..., DensityFunction]) -> Callable[..., DensityFunction]:
+    LOADERS[name] = loader
+
 
 def load_rho(path: str | Path) -> DensityFunction:
     """Loads a callable rho function from a specified data file.
