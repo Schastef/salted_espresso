@@ -1,10 +1,35 @@
 from .types import *
+from typing import Dict, Tuple
+from .core import RadialFunctions
 import numpy as np
 from scipy.integrate import quad
 from scipy.special import gamma
 
 
-class PrimitiveGaussianRadial:
+class PrimitiveGaussianRadials(RadialFunctions):
+
+    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max, alphas: list[float] | Dict[Tuple[int, int], float]):
+        super().__init__(species, origin, n_max, l_max)
+
+        if isinstance(alphas, list):
+            if len(alphas) != len(self):
+                raise ValueError(f"Expected {self.n_max} alphas for n_max={self.n_max}, but got {len(alphas)}.")
+            self.alphas = {self.running_to_lexographic_index(idx): alpha for idx, alpha in enumerate(alphas)}
+        elif isinstance(alphas, dict):
+            expected_keys = {self.running_to_lexographic_index(idx) for idx in range(len(self))}
+            if set(alphas.keys()) != expected_keys:
+                raise ValueError(f"Expected keys {expected_keys} for alphas dict, but got {set(alphas.keys())}.")
+            self.alphas = alphas
+
+        self.radials = []
+        for (n, l) in self.alphas:
+            alpha = self.alphas[(n, l)]
+            radial_func = PrimitiveGaussian(alpha, l)
+            self.radials.append(radial_func)
+
+
+
+class PrimitiveGaussian:
     """Primitive Gaussian radial function implementing the ``RadialFunction`` protocol.
 
     Represents a radial function of the form
@@ -27,14 +52,17 @@ class PrimitiveGaussianRadial:
     def __init__(self, alpha: float, l: int):
         self.alpha = alpha
         self.l = l
-        self.amplitude = self.compute_norm_amplitude("analytical")
+        self.amplitude = self._compute_norm_amplitude("analytical")
 
 
-    def __call__(self, r: ScalarOrArray) -> ScalarOrArray:
-        return self.amplitude * np.exp(-self.alpha * r**2) * r**self.l
+    def __call__(self, r: np.ndarray) -> np.ndarray:
+        r_arr = np.asarray(r)
 
+        result = self.amplitude * np.exp(-self.alpha * r_arr**2) * r_arr**self.l
 
-    def compute_norm_amplitude(self, method: str = "analytical") -> float:
+        return result
+
+    def _compute_norm_amplitude(self, method: str = "analytical") -> float:
         match method:
             case "analytical":
                 k = (3.0 + 2.0 * self.l) / 2.0
