@@ -4,8 +4,26 @@ from scipy.integrate import quad
 from scipy.special import gamma
 
 
-class GaussianRadial:
+class PrimitiveGaussianRadial:
+    """Primitive Gaussian radial function implementing the ``RadialFunction`` protocol.
 
+    Represents a radial function of the form
+
+        R(r) = A * r**l * exp(-alpha * r**2),
+
+    where ``alpha`` is the Gaussian exponent, ``l`` is the angular momentum,
+    and ``A`` is a normalization constant chosen such that
+
+        integral_0^infinity |R(r)|^2 r^2 dr = 1.
+
+    Parameters
+    ----------
+    alpha : float
+        Gaussian exponent controlling the radial decay.
+    l : int
+        Angular momentum quantum number. Determines the polynomial prefactor
+        ``r**l``.
+    """
     def __init__(self, alpha: float, l: int):
         self.alpha = alpha
         self.l = l
