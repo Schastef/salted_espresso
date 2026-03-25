@@ -3,12 +3,12 @@ from typing import Callable, Dict
 
 LOADERS: Dict[str, Callable[..., RIBasis]] = {}
 
-def register_loader(name: str, loader: Callable[..., DensityFunction]) -> Callable[..., DensityFunction]:
+def register_loader(name: str, loader: Callable[..., RIBasis]) -> Callable[..., RIBasis]:
     LOADERS[name] = loader
 
 def load(method: str, **kwargs) -> RIBasis:
     """
-    Returns an RIBasis, a mapping from RIKeys to callable RI functions.
+    Defines a method that returns an RI Basis.
 
     Parameters:
         method (str): Method to construct RI Basis

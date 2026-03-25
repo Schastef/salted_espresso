@@ -1,11 +1,13 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Union, Iterator
 import numpy as np
 import numpy.typing as npt
 from collections.abc import Mapping
 
 ArrayF = npt.NDArray[np.float64]
 ArrayC = npt.NDArray[np.complex128]
+
+ScalarOrArray = Union[float, ArrayF]
 
 
 @dataclass(frozen=True)
@@ -33,17 +35,17 @@ class BasisSetDimension:
 
 
 class RadialFunction(Protocol):
-    def __call__(self, r: float | ArrayF) -> float | ArrayF:
+    def __call__(self, r: ScalarOrArray) -> ScalarOrArray:
         ...
 
 
 class AngularFunction(Protocol):
-    def __call__(self, theta: float | ArrayF, phi: float | ArrayF) -> complex | ArrayC:
+    def __call__(self, r: ScalarOrArray) -> ScalarOrArray:
         ...
 
 
 class RIBasisFunction(Protocol):
-    def __call__(self, r: ArrayF) -> complex | ArrayC:
+    def __call__(self, r: ScalarOrArray) -> ScalarOrArray:
         ...
 
     def get_key(self) -> RIKey:
@@ -56,5 +58,7 @@ class RIBasisFunction(Protocol):
         ...
 
 
-class RIBasis(Mapping[RIKey, RIBasisFunction], Protocol):
-    pass
+class RIBasis(Protocol):
+    def __getitem__(self, key: RIKey) -> RIBasisFunction: ...
+    def __iter__(selfs) -> Iterator: ...
+    def __len__(self) -> int: ...
