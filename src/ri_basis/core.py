@@ -33,6 +33,15 @@ class RIFunctions:
 
 
 class RadialFunctions(RIFunctions):
+    """Base class for all radial functions
+
+    RadialFunctions represents a set of radial functions, {R_{n,l}}, which are identified by their major and minor quantum numbers, n and l.
+
+    An implementation of RadialFunctions has to populate set.radials with a list of callable objects that represent R_{n,l} in lexographic order,
+    where n runs slow and l runs fast.
+
+    Calling RadialFunctions with a cartesian point R will give a list of floats, representing the evaulations R_{n,l}(r) in lexographic order.
+    """
 
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int):
         super().__init__(species, origin)
@@ -74,6 +83,10 @@ class RadialFunctions(RIFunctions):
 
 
 class AngularFunctions(RIFunctions):
+    """Base class for all angular functions
+
+    AnbgularFunctions represents a set of angular functions, {Y_l^m}}, which are identified by their minor and magnetic quantum numbers, l and m.
+    """
 
     def __init__(self, species: str, origin: tuple[float, float, float], l_max: int):
         super().__init__(species, origin)
@@ -103,6 +116,31 @@ class AngularFunctions(RIFunctions):
 
 
 class RIBasis(RIFunctions):
+    """Class representing a basis for the resolution of the identity (RI).
+
+    The class represents a set of functions X_{nl}^m, where each such function is a product of a radial component, R_{nl}, and
+    a angular component, Y_l^m. This set is centered around an origin, R, and associated with a specific chemical element.
+
+    When calling an RIBasis object with a set of N cartesian points {r}, it will return a (N, n_basis) numpy array, where n_basis is
+    the number of basis functions in the RI basis. The returned array contains the numerical evaluations of X_{nl}^m(r) in lexographic
+    order (n,l,m), where n runs slowest and m fastest. 
+
+    Example:
+    If n_max=2 and l_max=2, the RIBasis is a set of 18 X-functions. Calling ribasis([x,y,z]) will return a np.array containing the results
+    of [[X_{10}^0, X_{11}^-1, X_{11}^0, X_{11}^1, X_{12}^-2, X_{12}^-1 ... X_{12}^2, X_{20}^0, X_{21}^-1, ... , X_{22}^2]]
+
+    Parameters:
+    -----------
+        species (str): Chemical species associated with the basis
+        origin (tuple[float, float, float]): Origin of all basis functions
+        n_max (int): Maximum major quantum number for basis functions
+        l_max (int): Maximum minor quantum number for basis functions
+
+        radial_cls: Class of RadialFunctions, implementing the radial part of the basis
+        angular_cls: Class of AngularFunctions, implementing the angular part of the basis
+        radial_kwargs: Key-word arguments passed to RadialFunctions
+        angular_kwards: Key-word arguments passed to AngularFunction
+    """
 
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int,
                  radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions],
