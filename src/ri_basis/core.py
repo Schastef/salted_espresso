@@ -98,7 +98,7 @@ class AngularFunctions(RIFunctions):
         while count + (2 * l + 1) <= idx:
             count += 2 * l + 1
             l += 1
-        m = idx - count - l
+        m = idx - count
         return l, m - l
 
 
@@ -161,7 +161,7 @@ class RIBasis(RIFunctions):
             count += 2 * l + 1
             l += 1
 
-        m = idx - count - l
+        m = idx - count
         return n, l, m - l
 
 
