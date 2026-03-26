@@ -1,4 +1,3 @@
-from .types import *
 from typing import Dict, Tuple
 from .core import RadialFunctions
 import numpy as np
@@ -13,7 +12,7 @@ class PrimitiveGaussianRadials(RadialFunctions):
 
         if isinstance(alphas, list):
             if len(alphas) != len(self):
-                raise ValueError(f"Expected {self.n_max} alphas for n_max={self.n_max}, but got {len(alphas)}.")
+                raise ValueError(f"Expected {len(self)} alphas for n_max={self.n_max} and l_max={self.l_max}, but got {len(alphas)}.")
             self.alphas = {self.running_to_lexographic_index(idx): alpha for idx, alpha in enumerate(alphas)}
         elif isinstance(alphas, dict):
             expected_keys = {self.running_to_lexographic_index(idx) for idx in range(len(self))}

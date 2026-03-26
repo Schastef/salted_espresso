@@ -1,13 +1,12 @@
-from .core import RadialFunctions
-from .types import ScalarOrArray, ArrayF
+from .core import AngularFunctions
 import numpy as np
 import sphericart as sc
 
 
-class RealSphericalHarmonics(RadialFunctions):
+class RealSphericalHarmonics(AngularFunctions):
 
-    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int):
-        super().__init__(species, origin, n_max, l_max)
+    def __init__(self, species: str, origin: tuple[float, float, float], l_max: int):
+        super().__init__(species, origin, l_max)
         self.sph_harm = sc.SphericalHarmonics(l_max)
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
@@ -17,4 +16,4 @@ class RealSphericalHarmonics(RadialFunctions):
         sph_vals = self.sph_harm.compute(r)
         sph = np.asarray(sph_vals)
 
-        return np.tile(sph, (1, self.n_max))
+        return sph

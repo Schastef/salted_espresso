@@ -1,4 +1,3 @@
-from .types import *
 import numpy as np
 
 
@@ -81,7 +80,7 @@ class AngularFunctions(RIFunctions):
         self.l_max = l_max
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
-        pass
+        raise NotImplementedError
 
 
     def __len__(self):
@@ -106,29 +105,41 @@ class AngularFunctions(RIFunctions):
 class RIBasis(RIFunctions):
 
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int,
-                 radial_funcs: RadialFunctions, angular_funcs: AngularFunctions):
+                 radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions],
+                 radial_kwargs: dict = None, angular_kwargs: dict = None):
         super().__init__(species, origin)
         self.n_max = n_max
         self.l_max = l_max
-        self.radial_funcs = radial_funcs
-        self.angular_funcs = angular_funcs
+
+        radial_kwargs = radial_kwargs or {}
+        angular_kwargs = angular_kwargs or {}
+
+        # Instantiate radial and angular components
+        # We pass common parameters (species, origin, n_max/l_max) automatically
+        # Note: RadialFunctions expects (species, origin, n_max, l_max) + extra args
+        # AngularFunctions expects (species, origin, l_max) + extra args
+
+        self.radial_funcs = radial_cls(species, origin, n_max, l_max, **radial_kwargs)
+        self.angular_funcs = angular_cls(species, origin, l_max, **angular_kwargs)
 
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
         if r.ndim != 2 or r.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
 
-        # Components expect coordinates relative to their center (passed 'r' is assumed relative)
         rad_vals = self.radial_funcs(r)  # Shape (N, n_rad_pairs)
         ang_vals = self.angular_funcs(r) # Shape (N, n_ang_funcs)
 
-        raise NotImplementedError
+        repeats = [2 * l + 1 for l in range(self.l_max + 1)] * self.n_max
+        rad_vals_expanded = np.repeat(rad_vals, repeats, axis=1)
 
+        ang_vals_expanded = np.tile(ang_vals, (1, self.n_max))
 
+        return rad_vals_expanded * ang_vals_expanded
 
 
     def __len__(self):
-        return self.n_max * sum(2 * l + 1 for l in range(self.l_max + 1))
+        return self.n_max * (self.l_max+1)**2
 
 
     def lexographic_to_running_index(self, index: tuple) -> int:
