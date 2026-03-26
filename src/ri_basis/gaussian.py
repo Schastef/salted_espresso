@@ -6,6 +6,29 @@ from scipy.special import gamma
 
 
 class PrimitiveGaussianRadials(RadialFunctions):
+    """Set of primitive Gaussian Radial functions, used as the RadialFunctions class when constructing an RI-Basis.
+
+    The class represents a collection of primitive Gaussian radial functions, that is:
+        {R_{nl}(r) = A(n,l) * r^l * exp(-alpha(n,l) * r^2)}
+
+    The set {R_{nl}(r)} is associated with a position, R, and an atomic species.
+
+    The size of the set is defined by the maximum major quantum number, n_max, and maximum minor quantum number, l_max. To define the Gaussian
+    radials, each combination of (n, l) requires an alpha-value, which needs to be provided as a key-word argument.
+
+    Parameters
+    ----------
+        species (str): The atomic species of this set of radials
+        origin (tuple[float, float, float]): Origin of all radial functions
+        n_max (int): Highest major quantum number contained in the basis
+        l_max (int): Highest minor quantum number contained in the basis
+
+        alphas(Dict | Tuple): Alpha values, can be passed as dictionary or tuple.
+            Dict: If passed as dictionary, needs to be passed as a mapping of (n,l) tuples to alpha values, e.g.
+            {(1, 0): 1.0, (1, 1): 0.5, (2, 0): 0.3 ...)
+            Tuple: If passed as tuple, alpha values are expected to be in lexographic order (n,l), where n runs slow and l fast, i.e.
+            (alpha(1,0), alpha(1,1), alpha(2,0), alpha(2,1), ...)    
+    """
 
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max, alphas: list[float] | Dict[Tuple[int, int], float]):
         super().__init__(species, origin, n_max, l_max)
@@ -29,7 +52,7 @@ class PrimitiveGaussianRadials(RadialFunctions):
 
 
 class PrimitiveGaussian:
-    """Primitive Gaussian radial function implementing the ``RadialFunction`` protocol.
+    """Primitive Gaussian radial function.
 
     Represents a radial function of the form
 
