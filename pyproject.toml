@@ -26,6 +26,8 @@ include = [
     "density_fitting.*",
     "ri_basis",
     "ri_basis.*",
+    "projections",
+    "projections.*",
 ]
 
 [tool.pytest.ini_options]
