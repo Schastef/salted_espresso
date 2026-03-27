@@ -22,7 +22,7 @@ def load_basis(species: str,
                n_max: int,
                l_max: int,
                radial_method: str = "gaussian",
-               angular_method: str = "spherical_harmonics",
+               angular_method: str = "real_spherical",
                radial_params: Optional[Dict[str, Any]] = None,
                angular_params: Optional[Dict[str, Any]] = None) -> RIBasis:
     """
