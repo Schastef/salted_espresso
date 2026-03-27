@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 
 import numpy as np
+import pytest
 
 from electronic_density.cube2rho import PlaneWaveDensity
 
@@ -52,3 +53,38 @@ def test_batch_chunk_size_is_at_least_one_for_tiny_memory_budget() -> None:
     rho_obj = make_small_density()
     rho_obj.max_batch_memory_mb = 0.0
     assert rho_obj._batch_chunk_size() >= 1
+
+
+def make_asymmetric_density(policy: str) -> PlaneWaveDensity:
+    # No conjugate pairing in rho_g/G, so rho(r) is generally complex.
+    rho_g = np.array([1.0 + 0.2j, -0.3 + 0.1j], dtype=np.complex128)
+    G = np.array([[0.3, 0.0, 0.0], [0.0, 0.7, 0.0]], dtype=float)
+    return PlaneWaveDensity(
+        rho_g=rho_g,
+        G=G,
+        complex_result_policy=policy,
+        imag_abs_tol=1e-12,
+        imag_rel_tol=0.0,
+    )
+
+
+def test_complex_residual_raises_in_strict_mode() -> None:
+    rho_obj = make_asymmetric_density(policy="raise")
+    with pytest.raises(ValueError, match="complex beyond tolerance"):
+        rho_obj(np.array([0.4, -0.2, 0.0]))
+
+
+def test_complex_residual_warns_and_coerces_to_real() -> None:
+    rho_obj = make_asymmetric_density(policy="warn")
+    with pytest.warns(RuntimeWarning, match="imaginary residual"):
+        value = rho_obj(np.array([0.4, -0.2, 0.0]))
+    assert np.isrealobj(value)
+
+
+def test_small_imaginary_noise_is_accepted() -> None:
+    rho_obj = make_small_density()
+    rho_obj.complex_result_policy = "raise"
+    rho_obj.imag_abs_tol = 1e-6
+
+    value = rho_obj._to_real_scalar(np.complex128(2.0 + 5e-7j))
+    assert value == pytest.approx(2.0)

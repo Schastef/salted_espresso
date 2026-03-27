@@ -1,7 +1,8 @@
 from pathlib import Path
-from dataclasses import dataclass
-from typing import TypedDict
+from dataclasses import dataclass, field
+from typing import Literal, TypedDict
 from collections.abc import Iterable, Iterator
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -31,6 +32,12 @@ class PlaneWaveDensity:
     G: np.ndarray
     # Upper bound for temporary arrays used during rho(r) evaluation.
     max_batch_memory_mb: float = 64.0
+    # Imaginary residual tolerated before treating the result as inconsistent.
+    imag_abs_tol: float = 1e-6
+    imag_rel_tol: float = 1e-10
+    # Behavior when imag(rho) exceeds tolerance: raise, warn+coerce, or coerce.
+    complex_result_policy: Literal["raise", "warn", "coerce"] = "warn"
+    _warned_complex_result: bool = field(default=False, init=False, repr=False)
 
     def _batch_chunk_size(self) -> int:
         """Number of G-vectors processed per streamed dot-product chunk."""
@@ -58,12 +65,38 @@ class PlaneWaveDensity:
 
         return accum / n_terms
 
-    @staticmethod
-    def _to_real_scalar(value: np.complexfloating) -> np.floating:
-        real_value = np.real_if_close(value, tol=1e-6)
-        if np.isrealobj(real_value):
-            return np.float64(np.real(real_value))
-        raise ValueError("Result is complex, but expected real. Check if G and rho_g are correct.")
+    def _to_real_scalar(self, value: np.complexfloating) -> np.floating:
+        real_part = float(np.real(value))
+        imag_abs = float(abs(np.imag(value)))
+
+        tol = self.imag_abs_tol + self.imag_rel_tol * max(abs(real_part), 1.0)
+        if imag_abs <= tol:
+            return np.float64(real_part)
+
+        if self.complex_result_policy == "raise":
+            raise ValueError(
+                "Result is complex beyond tolerance: "
+                f"|Im(rho)|={imag_abs:.3e}, tolerance={tol:.3e}. "
+                "Check reciprocal-space symmetry rho(-G)=conj(rho(G)) or relax tolerances."
+            )
+
+        if self.complex_result_policy == "warn" and not self._warned_complex_result:
+            warnings.warn(
+                "rho(r) has a non-negligible imaginary residual; returning the real part. "
+                f"|Im(rho)|={imag_abs:.3e}, tolerance={tol:.3e}. "
+                "Set complex_result_policy='raise' for strict behavior.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            self._warned_complex_result = True
+
+        if self.complex_result_policy not in {"warn", "coerce", "raise"}:
+            raise ValueError(
+                f"Invalid complex_result_policy={self.complex_result_policy!r}; "
+                "expected one of {'raise', 'warn', 'coerce'}."
+            )
+
+        return np.float64(real_part)
 
     def _iter_values(self, points: Iterable[object]) -> Iterator[np.floating]:
         for index, point in enumerate(points):

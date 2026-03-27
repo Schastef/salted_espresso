@@ -58,10 +58,22 @@ rho = load_rho("tests/data/nvp_rho.cube")
 # single point
 val = rho(np.array([0.0, 0.0, 0.0]))
 
-# many points
+# many points (eager, returns ndarray)
 points = np.random.rand(10, 3)
 vals = rho(points)
+
+# many points (streamed, keeps temporary memory bounded)
+streamed_vals = rho((point for point in points))
+for value in streamed_vals:
+    ...
 ```
+
+`PlaneWaveDensity` now evaluates points in a streamed way internally, trading
+runtime for lower peak temporary memory during `rho(r)` calls.
+
+If tiny imaginary residuals appear from floating-point noise, `rho(r)` returns
+the real part by default and emits a one-time warning. For strict behavior, set
+`complex_result_policy="raise"` on the `PlaneWaveDensity` object.
 
 ### Adding a new density backend (`x2rho`)
 
@@ -161,4 +173,3 @@ def NewRadials(RadialFunction):
 from .new_radial import NewRadials
 register_radial("my_method", NewRadials)
 ```
-
