@@ -1,6 +1,7 @@
 from pathlib import Path
 from dataclasses import dataclass
 from typing import TypedDict
+from collections.abc import Iterable, Iterator
 
 import numpy as np
 import numpy.typing as npt
@@ -28,26 +29,73 @@ class RhoG:
 class PlaneWaveDensity:
     rho_g: np.ndarray
     G: np.ndarray
+    # Upper bound for temporary arrays used during rho(r) evaluation.
+    max_batch_memory_mb: float = 64.0
 
-    def __call__(self, r: npt.NDArray[np.floating]) -> npt.NDArray[np.floating] | np.floating:
-        N = len(self.rho_g)
-        r = np.asarray(r, dtype=float)
+    def _batch_chunk_size(self) -> int:
+        """Number of G-vectors processed per streamed dot-product chunk."""
+        n_g = len(self.rho_g)
+        if n_g == 0:
+            return 1
 
-        if r.shape == (3,):
-            result = np.sum(self.rho_g * np.exp(1j * (self.G @ r))) / N
+        target_bytes = max(int(self.max_batch_memory_mb * 1024 * 1024), 16)
+        # Per element we allocate a real phase and a complex exponential.
+        approx_bytes_per_g = np.dtype(np.float64).itemsize + np.dtype(np.complex128).itemsize
+        return max(min(target_bytes // max(approx_bytes_per_g, 1), n_g), 1)
 
-        elif r.ndim == 2 and r.shape[1] == 3:
-            result = np.exp(1j * (r @ self.G.T)) @ self.rho_g / N
+    def _evaluate_single_point(self, point: npt.NDArray[np.floating]) -> np.complex128:
+        n_terms = len(self.rho_g)
+        if n_terms == 0:
+            return np.complex128(0.0)
 
-        else:
-            raise ValueError(f"r must have shape (3,) or (n, 3), got {r.shape}")
+        chunk_size = self._batch_chunk_size()
+        accum = np.complex128(0.0)
 
-        result = np.real_if_close(result, tol=1e-6)
+        for start in range(0, n_terms, chunk_size):
+            stop = min(start + chunk_size, n_terms)
+            phase = self.G[start:stop] @ point
+            accum += np.dot(self.rho_g[start:stop], np.exp(1j * phase))
 
-        if np.isreal(result).all():
-            return result
-        else:
-            raise ValueError("Result is complex, but expected real. Check if G and rho_g are correct.")
+        return accum / n_terms
+
+    @staticmethod
+    def _to_real_scalar(value: np.complexfloating) -> np.floating:
+        real_value = np.real_if_close(value, tol=1e-6)
+        if np.isrealobj(real_value):
+            return np.float64(np.real(real_value))
+        raise ValueError("Result is complex, but expected real. Check if G and rho_g are correct.")
+
+    def _iter_values(self, points: Iterable[object]) -> Iterator[np.floating]:
+        for index, point in enumerate(points):
+            point_arr = np.asarray(point, dtype=float)
+            if point_arr.shape != (3,):
+                raise ValueError(f"Each streamed point must have shape (3,), got {point_arr.shape} at index {index}")
+            yield self._to_real_scalar(self._evaluate_single_point(point_arr))
+
+    def __call__(
+        self,
+        r: npt.NDArray[np.floating] | Iterable[object],
+    ) -> npt.NDArray[np.floating] | np.floating | Iterator[np.floating]:
+        if isinstance(r, np.ndarray):
+            r_arr = np.asarray(r, dtype=float)
+            if r_arr.shape == (3,):
+                return self._to_real_scalar(self._evaluate_single_point(r_arr))
+
+            if r_arr.ndim == 2 and r_arr.shape[1] == 3:
+                result = np.empty(r_arr.shape[0], dtype=float)
+                for index, point in enumerate(r_arr):
+                    result[index] = self._to_real_scalar(self._evaluate_single_point(point))
+                return result
+
+            raise ValueError(f"r must have shape (3,) or (n, 3), got {r_arr.shape}")
+
+        if isinstance(r, Iterable):
+            return self._iter_values(r)
+
+        r_arr = np.asarray(r, dtype=float)
+        if r_arr.shape == (3,):
+            return self._to_real_scalar(self._evaluate_single_point(r_arr))
+        raise ValueError(f"r must have shape (3,) or (n, 3), got {r_arr.shape}")
 
     def memory_usage_mb(self) -> float:
         """Estimation of memory usage in megabytes to store the plane wave density data."""
@@ -151,6 +199,3 @@ def load_rho_from_cube(path: Path) -> DensityFunction:
     cube_dict = load_cubefile(path)
     rhog = compute_rho_g(cube_dict["data"], cube_dict["spacing"])
     return PlaneWaveDensity(rhog.rho_g, rhog.G)
-
-
-

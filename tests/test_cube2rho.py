@@ -230,3 +230,29 @@ class TestRhoReconstruction:
                 f"Grid point ({i},{j},{k}): |Im(rho)| = {imag_abs:.2e} "
                 f"exceeds absolute tolerance 1e-6"
             )
+
+    def test_chunked_batch_matches_vectorized_reference(self, rho_obj):
+        rng = np.random.default_rng(7)
+        r_batch = rng.normal(size=(64, 3))
+
+        previous = rho_obj.max_batch_memory_mb
+        try:
+            # Force chunked execution path to run many chunks.
+            rho_obj.max_batch_memory_mb = 0.001
+            actual = rho_obj(r_batch)
+        finally:
+            rho_obj.max_batch_memory_mb = previous
+
+        N = len(rho_obj.rho_g)
+        expected = np.exp(1j * (r_batch @ rho_obj.G.T)) @ rho_obj.rho_g / N
+        expected = np.real_if_close(expected, tol=1e-6)
+
+        np.testing.assert_allclose(actual, expected, atol=1e-10)
+
+    def test_chunk_size_is_at_least_one(self, rho_obj):
+        previous = rho_obj.max_batch_memory_mb
+        try:
+            rho_obj.max_batch_memory_mb = 0.0
+            assert rho_obj._batch_chunk_size() >= 1
+        finally:
+            rho_obj.max_batch_memory_mb = previous
