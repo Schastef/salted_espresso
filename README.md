@@ -13,12 +13,6 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
-
-This ensures that:
-
-- package imports work correctly (no `src` in import paths)
-- local code changes are immediately visible
-
 ---
 
 
