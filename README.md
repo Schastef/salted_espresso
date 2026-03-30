@@ -112,29 +112,31 @@ $$
 
 ---
 
-## RI Basis
-The central entry point is
+## RI Basis Sets
+The central entry points are
 
 ```python
 from ri_basis import load_basis
+from ri_basis import load_basis_set
 ```
 
-This returns a `RIBasis` object, which represents a set of functions $\{\chi_{nl}^m(\mathbf{r}-\mathbf{R})= R_{nl}(\mathbf{r}-\mathbf{R})Y_l^m(\mathbf{r}-\mathbf{R})\}_S$, 
-centered around and atom with chemical species $S$ at position $R$. Each function is a product of a radial part $R_{nl}$ and an angular part $Y_l^m$ (spherical harmonics).
+`load_basis` returns `RIBasis` object, which represents a set of functions $\{\chi_{nl}^m(\mathbf{r}-\mathbf{R})= R_{nl}(\mathbf{r}-\mathbf{R})Y_l^m(\mathbf{r}-\mathbf{R})\}_S$, centered around and atom with chemical species $S$ at position $R$. Each function is a product of a radial part $R_{nl}$ and an angular part $Y_l^m$ (spherical harmonics).
 
-The `RIBasis` object is callable, taking a set of $N$ cartesian coordinates $\mathbf{r}$ as input, mapping it to a Numpy array of the shape `(N, n_basis)` containing the values of each basis function at each input point.
+The latter returns a `RIBasisSet` object, which is a collection of `RIBasis` objects, one for each atom. `load_basis_set` requires a structure file that can be parsed by ASE (such as .cube, .xyz, .cif etc) and a `specifications` dictionary that, for each element, specifies the parameters for constructing a basis set. 
+
+An individual `RIBasis` object is callable, taking a set of $N$ cartesian coordinates $\mathbf{r}$ as input, mapping it to a Numpy array of the shape `(N, n_basis)` containing the values of each basis function at each input point.
 The returned array is in lexographic order with (n, l, m), where n runs fastest and m slowest. For example, calling an ```RIBasis```
 object with ```n_max=2``` and ```l_max=1``` will return an array with following resutls:
 
 $$[[\chi_{10}^0(\mathbf{r_1}),\:\chi_{11}^{-1}(\mathbf{r_1}),\:\chi_{11}^0(\mathbf{r_1}),\:\chi_{11}^1(\mathbf{r_1}),\:\chi_{20}^0(\mathbf{r_1}),\:\chi_{21}^{-1}(\mathbf{r_1}),\:...],\;[\chi_{10}^{0}(\mathbf{r_2}),...], ...]$$
 
-When the ```RIBasis``` is instantiated, the user has to specify a method for computing the radial and angular part of the basis function.
+Calling the `RIBasisSet` returns a block matrix where each block is the result of calling the individual `RIBasis`. The ordering corresponds to the order of appearance of the structure file from which `RIBasisSet` was created.
 
-### Quick Example
+### Quick Example: Load RIBasis of a single atom
 
 ```python
 import numpy as np
-from ri_basis.loader import load_basis, register_angular, register_radial
+from ri_basis.loader import load_basis
 
 species = 'H'
 R = (0.0, 0.0, 0.0)
@@ -151,6 +153,17 @@ r = np.array([[0.0, 0.0, 0.1], [0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
 print(basis(r))
 ```
 
+### Quick Example: Load RIBasis of a structure
+```python
+import numpy as np
+from ri_basis.loader import load_basis_set
+
+structure_file = "./tests/data/nvp_rho.cube"
+specifications_file = "./tests/data/example_primitive_gaussian.json"
+
+basis_set = load_basis_set(structure_file, specifications_file)
+
+```
 
 ### Adding a new radial method
 To add a new way to compute the radial part of the basis function:
