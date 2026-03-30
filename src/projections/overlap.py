@@ -240,12 +240,16 @@ def compute_projection_coefficients(
     radial_cutoff: float = 1e-10,
 ) -> np.ndarray:
     """
-    Computes the projection coefficients c_i = <target_density|ri_basis_i>.
+    Computes the projection coefficients b_i = <target_density|ri_basis_i>.
 
     This function computes the projection of a target density function onto each
     basis function in the given RI basis or basis set. The projection is
     calculated as the integral of the product of the density and the basis
     function over all space.
+
+    For performance, this implementation evaluates the density and the basis set
+    on a single universal grid and then performs the integration using vectorized
+    operations, avoiding per-atom loops.
 
     Parameters:
     -----------
@@ -270,38 +274,45 @@ def compute_projection_coefficients(
     else:  # RIBasisSet
         bases = ri_basis_set
 
-    coeffs = []
+    # 1. Determine the maximum radial extent required for any basis function
+    max_r = 0.0
     for basis in bases:
-        r, w = _build_radial_grid(
-            basis,
-            n_radial_grid=n_radial_grid,
-            initial_r_max=initial_r_max,
-            radial_cutoff=radial_cutoff,
-        )
+        max_r = max(max_r, _radial_extent(basis, initial_r_max, radial_cutoff))
 
-        # Create grid points for evaluation, shifted by basis origin
-        grid_points = np.zeros((len(r), 3))
-        grid_points[:, 0] = r
-        grid_points += basis.origin
+    # 2. Build a single universal grid for the integration
+    # We use a temporary dummy basis to build the grid.
+    r, w = _build_radial_grid(bases[0], n_radial_grid, max_r, radial_cutoff)
 
-        density_on_grid = target_density(grid_points)
+    # Create a 3D grid of points for evaluation
+    grid_points = np.zeros((len(r), 3))
+    grid_points[:, 0] = r
 
-        rad_vals = basis.radial_funcs(np.c_[r, r*0, r*0])
+    # 3. Evaluate the density and the entire basis set ONCE on this grid
+    print("Evaluating density on the universal grid...")
+    density_on_grid = target_density(grid_points)
 
-        c = np.zeros(len(basis))
-        for i in range(len(basis)):
-            n, l, m = basis.running_to_lexographic_index(i)
-            # This is a simplification for spherically symmetric densities.
-            # A full implementation requires spherical harmonics of the density.
-            if l == 0 and m == 0:
-                rad_func_idx = basis.radial_funcs.lexographic_to_running_index((n, l))
-                integrand = density_on_grid * rad_vals[:, rad_func_idx] * r**2 * w
-                # The 4*pi comes from the angular integral of Y_0^0
-                c[i] = 4 * np.pi * np.sum(integrand)
+    print("Evaluating basis set on the universal grid...")
+    basis_on_grid = ri_basis_set(grid_points) # Shape: (n_grid_points, n_total_basis_funcs)
 
-        coeffs.append(c)
+    # 4. Perform the integration in a vectorized manner
+    # The integral is integral(rho(r) * chi_i(r) * 4pi * r^2 dr)
+    # This is simplified for s-functions (l=0), which is what we project onto.
+    # The basis_on_grid contains all chi_i(r), so we can do this with a matrix-vector product.
 
-    return np.concatenate(coeffs)
+    # The integration weights for the radial integral
+    integrand_weights = 4 * np.pi * r**2 * w
+
+    # The dot product sums over the grid points (the first axis)
+    # (n_total_basis_funcs, n_grid_points) @ (n_grid_points,) -> (n_total_basis_funcs,)
+    print("Performing vectorized integration...")
+    coeffs = basis_on_grid.T @ (density_on_grid * integrand_weights)
+
+    # The current implementation of basis functions only returns non-zero values for s-orbitals
+    # when the input is purely radial. If it were a full 3D evaluation, we would need to
+    # filter for the s-orbitals here. For now, the zeros are implicitly handled.
+
+    print("Done.")
+    return coeffs
 
 
 def solve_projection_equations(

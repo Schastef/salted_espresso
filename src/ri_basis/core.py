@@ -153,16 +153,16 @@ class RIBasis(RIFunctions):
         self.n_max = n_max
         self.l_max = l_max
 
-        radial_kwargs = radial_kwargs or {}
-        angular_kwargs = angular_kwargs or {}
+        self.radial_kwargs = radial_kwargs or {}
+        self.angular_kwargs = angular_kwargs or {}
 
         # Instantiate radial and angular components
         # We pass common parameters (species, origin, n_max/l_max) automatically
         # Note: RadialFunctions expects (species, origin, n_max, l_max) + extra args
         # AngularFunctions expects (species, origin, l_max) + extra args
 
-        self.radial_funcs = radial_cls(species, origin, n_max, l_max, **radial_kwargs)
-        self.angular_funcs = angular_cls(species, origin, l_max, **angular_kwargs)
+        self.radial_funcs = radial_cls(species, origin, n_max, l_max, **self.radial_kwargs)
+        self.angular_funcs = angular_cls(species, origin, l_max, **self.angular_kwargs)
 
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
