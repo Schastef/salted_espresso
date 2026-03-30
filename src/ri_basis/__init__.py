@@ -1,6 +1,6 @@
 from .loader import load_basis, register_angular, register_radial
 from .gaussian import PrimitiveGaussianRadials
-from .realspherharmonic import RealSphericalHarmonics
+from .real_spher_harmonic import RealSphericalHarmonics
 
 
 register_radial("gaussian", PrimitiveGaussianRadials)

@@ -1,4 +1,8 @@
 import numpy as np
+from ase.io import read
+import json
+
+from typing import List, Tuple, Callable, Iterator
 
 
 class RIFunctions:
@@ -203,23 +207,102 @@ class RIBasis(RIFunctions):
         return n, l, m - l
 
 
+class RIBasisSet():
+    """Class representing a complete RI basis for a structure, that is, a list of RIBasis objects for every atom
+
+    Parameters
+    ----------
+
+    structure_file: str
+        Path to a structure file (e.g. .xyz, .cif) containing the structural information. Read with ase.io.read
+    specifications: dict | str
+        A dictionary mapping chemical species to their basis specifications. The basis specifications correspond
+        directly to the parameters of RIBasis, except for species and origin which are determined from the structure file
+        For example:
+
+        {
+            "O": {
+                "n_max": 2,
+                "l_max": 2,
+                "radial_method": "gaussian",
+                "angular_method": "real_spherical",
+                "radial_kwargs": {"alphas": [0.5, 1.0]},
+                "angular_kwargs": {}
+            },
+        }
+
+    The dictionary can be provided as a path to as .json file as well.
+
+    ribasis_loader: Callable
+        A function that takes the parameters (species, origin, n_max, l_max, radial_method, angular_method, radial_kwargs,
+        angular_kwargs) and returns an RIBasis object.
+
+    order_by_species: bool
+        Whether to order the RIBasis objects in the final list by species. If False, the ordering will be the same as in
+        the structure file.
+
+    Methods:
+    --------
+
+    __call__(r: np.ndarray) -> np.ndarray
+        Calling the RIBasisSet with a set of cartesian points will return a block diagonal array containing the
+        individual evaluations of the RIBasis functions for each atom.
+
+    """
+
+    def __init__(self, structure_file: str, specifications: dict | str,
+                 ribasis_loader: Callable, order_by_species: bool = False):
+        if isinstance(specifications, str):
+            with open(specifications, 'r') as f:
+                specifications = json.load(f)
+        self.specifications = specifications
+        self.species_and_positions = self._load_structure(structure_file, return_ordered=order_by_species)
+        self.ribases = []
+        self.loader_func = ribasis_loader
+
+        for species, position in self.species_and_positions:
+            if species not in specifications:
+                raise ValueError(f"Species '{species}' found in structure file but not in specifications.")
+            ribasis = self._load_ribasis(species, position)
+            self.ribases.append(ribasis)
 
 
+    def __call__(self, r: np.ndarray) -> np.ndarray:
+        if r.ndim != 2 or r.shape[1] != 3:
+            raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
+
+        results = [ribasis(r) for ribasis in self.ribases]
+        return np.hstack(results)
 
 
+    def __len__(self) -> int:
+        return len(self.ribases)
 
 
+    def __iter__(self) -> Iterator[RIBasis]:
+        return iter(self.ribases)
 
 
+    def __getitem__(self, item):
+        return self.ribases[item]
 
 
+    @staticmethod
+    def _load_structure(structure_file: str, return_ordered: bool) \
+            -> List[Tuple[str, Tuple[float, float, float]]]:
+        atoms = read(str(structure_file))
+        species_list: List[Tuple[str, Tuple[float, float, float]]] = [(str(atom.symbol), tuple(atom.position)) for atom in atoms]
+
+        if return_ordered:
+            species_list.sort(key=lambda x: (x[0], x[1][2], x[1][0], x[1][1]))
+
+        return species_list
 
 
-
-
-
-
-
-
-
-
+    def _load_ribasis(self, species: str, origin: tuple[float, float, float]) -> RIBasis:
+        specs = self.specifications[species]
+        return self.loader_func(
+            species=species,
+            origin=origin,
+            **specs
+        )

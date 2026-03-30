@@ -1,7 +1,7 @@
 from typing import Type, Any, Dict, Optional
 from .core import RIBasis, RadialFunctions, AngularFunctions
 from .gaussian import PrimitiveGaussianRadials
-from .realspherharmonic import RealSphericalHarmonics
+from .real_spher_harmonic import RealSphericalHarmonics
 
 RADIAL_REGISTRY: Dict[str, Type[RadialFunctions]] = {}
 
@@ -71,3 +71,29 @@ def load_basis(species: str,
                    radial_kwargs=radial_params,
                    angular_kwargs=angular_params)
 
+
+def load_basis_set(structure_file: str,
+                   specifications: dict | str,
+                   order_by_species: bool = False) -> "RIBasisSet":
+    """
+    Load a complete RI basis set for a given structure.
+
+    This function acts as a factory for creating an RIBasisSet object, injecting the
+    necessary loader function to construct individual RIBasis instances.
+
+    Parameters
+    ----------
+    structure_file : str
+        Path to a structure file (e.g., .xyz, .cif).
+    specifications : dict or str
+        A dictionary or path to a JSON file with basis specifications for each species.
+    order_by_species : bool, optional
+        If True, order the basis functions by species (default is False).
+
+    Returns
+    -------
+    RIBasisSet
+        The constructed RI basis set.
+    """
+    from .core import RIBasisSet  # Local import to avoid circular dependency
+    return RIBasisSet(structure_file, specifications, load_basis, order_by_species)
