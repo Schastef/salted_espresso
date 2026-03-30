@@ -153,7 +153,7 @@ r = np.array([[0.0, 0.0, 0.1], [0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
 print(basis(r))
 ```
 
-### Quick Example: Load RIBasis of a structure
+### Quick Example: Load RIBasisSet from a structure
 ```python
 import numpy as np
 from ri_basis.loader import load_basis_set
