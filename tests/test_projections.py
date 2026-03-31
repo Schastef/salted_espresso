@@ -11,7 +11,7 @@ import pytest
 import tempfile
 import os
 
-from projections.core import (
+from salted_espresso.projections.core import (
     MetricMethod,
     compute_condition_number,
     compute_overlap,
@@ -19,9 +19,9 @@ from projections.core import (
     compute_projectability,
     solve_projection_equations,
 )
-from ri_basis import load_basis
-from ri_basis.loader import load_basis_set
-from ri_basis.types import CutoffType
+from salted_espresso.ri_basis import load_basis
+from salted_espresso.ri_basis.loader import load_basis_set
+from salted_espresso.ri_basis.types import CutoffType
 
 
 # ---------------------------------------------------------------------------

@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 from scipy.integrate import quad
 
-from ri_basis import load_basis
-from ri_basis.core import AngularFunctions, RadialFunctions, RIBasis
-from ri_basis.gaussian import PrimitiveGaussian, PrimitiveGaussianRadials
-from ri_basis.realspherharmonic import RealSphericalHarmonics
+from salted_espresso.ri_basis import load_basis
+from salted_espresso.ri_basis.core import AngularFunctions, RadialFunctions, RIBasis
+from salted_espresso.ri_basis.gaussian import PrimitiveGaussian, PrimitiveGaussianRadials
+from salted_espresso.ri_basis.realspherharmonic import RealSphericalHarmonics
 
 
 # ---------------------------------------------------------------------------

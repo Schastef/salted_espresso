@@ -5,7 +5,7 @@ from collections.abc import Iterator
 import numpy as np
 import pytest
 
-from electronic_density.cube2rho import PlaneWaveDensity
+from salted_espresso.electronic_density.cube2rho import PlaneWaveDensity
 
 
 def make_small_density() -> PlaneWaveDensity:

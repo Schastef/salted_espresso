@@ -9,11 +9,11 @@
 import numpy as np
 import pytest
 
-from ri_basis import load_basis
-from ri_basis.core import RIBasis
-from ri_basis.gaussian import PrimitiveGaussianRadials
-from ri_basis.real_spher_harmonic import RealSphericalHarmonics
-from ri_basis.types import CutoffType
+from salted_espresso.ri_basis import load_basis
+from salted_espresso.ri_basis.core import RIBasis
+from salted_espresso.ri_basis.gaussian import PrimitiveGaussianRadials
+from salted_espresso.ri_basis.real_spher_harmonic import RealSphericalHarmonics
+from salted_espresso.ri_basis.types import CutoffType
 
 
 # ---------------------------------------------------------------------------

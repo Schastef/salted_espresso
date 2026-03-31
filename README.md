@@ -43,14 +43,14 @@ pytest
 The central entry point is:
 
 ```python
-from electronic_density import load_rho
+from salted_espresso.electronic_density import load_rho
 rho = load_rho(path)
 ```
 
 ### Quick example
 
 ```python
-from electronic_density import load_rho
+from salted_espresso.electronic_density import load_rho
 import numpy as np
 
 rho = load_rho("tests/data/nvp_rho.cube")
@@ -116,8 +116,8 @@ $$
 The central entry points are
 
 ```python
-from ri_basis import load_basis
-from ri_basis import load_basis_set
+from salted_espresso.ri_basis import load_basis
+from salted_espresso.ri_basis import load_basis_set
 ```
 
 `load_basis` returns `RIBasis` object, which represents a set of functions $\{\chi_{nl}^m(\mathbf{r}-\mathbf{R})= R_{nl}(\mathbf{r}-\mathbf{R})Y_l^m(\mathbf{r}-\mathbf{R})\}_S$, centered around and atom with chemical species $S$ at position $R$. Each function is a product of a radial part $R_{nl}$ and an angular part $Y_l^m$ (spherical harmonics).
@@ -136,7 +136,7 @@ Calling the `RIBasisSet` returns a block matrix where each block is the result o
 
 ```python
 import numpy as np
-from ri_basis.loader import load_basis
+from salted_espresso.ri_basis import load_basis
 
 species = 'H'
 R = (0.0, 0.0, 0.0)
@@ -156,7 +156,7 @@ print(basis(r))
 ### Quick Example: Load RIBasisSet from a structure
 ```python
 import numpy as np
-from ri_basis.loader import load_basis_set
+from salted_espresso.ri_basis import load_basis_set
 
 structure_file = "./tests/data/nvp_rho.cube"
 specifications_file = "./tests/data/example_primitive_gaussian.json"

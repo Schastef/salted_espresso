@@ -5,8 +5,8 @@ from typing import Literal, List
 
 import numpy as np
 
-from ri_basis.core import RIBasis, RIBasisSet
-from electronic_density.types import DensityFunction
+from salted_espresso.ri_basis.core import RIBasis, RIBasisSet
+from salted_espresso.electronic_density.types import DensityFunction
 
 
 class MetricMethod(str, Enum):

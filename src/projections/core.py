@@ -10,8 +10,8 @@ from .utils import (_parse_method,
                     _compute_single_basis_overlap,
                     MetricMethod)
 
-from ri_basis.core import RIBasis, RIBasisSet
-from electronic_density.types import DensityFunction
+from salted_espresso.ri_basis.core import RIBasis, RIBasisSet
+from salted_espresso.electronic_density.types import DensityFunction
 
 
 def compute_overlap(

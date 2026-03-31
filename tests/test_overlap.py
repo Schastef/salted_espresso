@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from projections.overlap import MetricMethod, compute_overlap
-from ri_basis import load_basis
+from salted_espresso.projections.overlap import MetricMethod, compute_overlap
+from salted_espresso.ri_basis import load_basis
 
 
 def _make_basis(n_max: int = 2, l_max: int = 1):
@@ -65,4 +65,3 @@ def test_invalid_method_raises() -> None:
     basis = _make_basis(n_max=1, l_max=0)
     with pytest.raises(ValueError, match="Unknown metric method"):
         compute_overlap(basis, method="invalid")
-
