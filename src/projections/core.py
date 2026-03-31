@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from enum import Enum
 from typing import Literal, List
 
 import numpy as np
@@ -10,15 +9,11 @@ from .utils import (_parse_method,
                     _build_radial_grid,
                     _overlap_radial_block,
                     _coulomb_radial_block,
-                    _compute_single_basis_overlap)
+                    _compute_single_basis_overlap,
+                    MetricMethod)
 
 from ri_basis.core import RIBasis, RIBasisSet
 from electronic_density.types import DensityFunction
-
-
-class MetricMethod(str, Enum):
-    OVERLAP = "overlap"
-    COULOMB = "coulomb"
 
 
 def compute_overlap(
