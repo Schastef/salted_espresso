@@ -3,6 +3,7 @@ from ase.io import read
 import json
 
 from typing import List, Tuple, Callable, Iterator
+from .types import Cutoff, CutoffType
 
 
 class RIFunctions:
@@ -17,7 +18,7 @@ class RIFunctions:
         r_arr = np.ascontiguousarray(r)
         if r_arr.ndim != 2 or r_arr.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r_arr.shape}")
-        return self.__call__(r_arr - self.origin)
+        return self.__call__(r_arr)
 
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
@@ -74,6 +75,8 @@ class RadialFunctions(RIFunctions):
     def __len__(self):
         return self.n_max * (self.l_max + 1)
 
+    def estimate_cutoff(self, threshold: float = 1e-6) -> float:
+        raise NotImplementedError
 
     def lexographic_to_running_index(self, index: tuple) -> int:
         n, l = index
@@ -148,7 +151,8 @@ class RIBasis(RIFunctions):
 
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int,
                  radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions],
-                 radial_kwargs: dict = None, angular_kwargs: dict = None):
+                 radial_kwargs: dict = None, angular_kwargs: dict = None,
+                 cell_vectors: np.ndarray = None, cutoff: Cutoff = CutoffType.NON_PERIODIC):
         super().__init__(species, origin)
         self.n_max = n_max
         self.l_max = l_max
@@ -156,28 +160,35 @@ class RIBasis(RIFunctions):
         self.radial_kwargs = radial_kwargs or {}
         self.angular_kwargs = angular_kwargs or {}
 
+        self.cell_vectors = cell_vectors
+        
         # Instantiate radial and angular components
-        # We pass common parameters (species, origin, n_max/l_max) automatically
-        # Note: RadialFunctions expects (species, origin, n_max, l_max) + extra args
-        # AngularFunctions expects (species, origin, l_max) + extra args
-
         self.radial_funcs = radial_cls(species, origin, n_max, l_max, **self.radial_kwargs)
         self.angular_funcs = angular_cls(species, origin, l_max, **self.angular_kwargs)
+
+        self.cutoff = self._resolve_cutoff(cutoff)
+        self.lattice_vectors = self._get_lattice_vectors()
 
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
         if r.ndim != 2 or r.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
 
-        rad_vals = self.radial_funcs(r)  # Shape (N, n_rad_pairs)
-        ang_vals = self.angular_funcs(r) # Shape (N, n_ang_funcs)
+        total_val = np.zeros((r.shape[0], len(self)))
 
-        repeats = [2 * l + 1 for l in range(self.l_max + 1)] * self.n_max
-        rad_vals_expanded = np.repeat(rad_vals, repeats, axis=1)
+        for G in self.lattice_vectors:
+            r_shifted = r - self.origin - G
+            rad_vals = self.radial_funcs(r_shifted)  # Shape (N, n_rad_pairs)
+            ang_vals = self.angular_funcs(r_shifted) # Shape (N, n_ang_funcs)
 
-        ang_vals_expanded = np.tile(ang_vals, (1, self.n_max))
+            repeats = [2 * l + 1 for l in range(self.l_max + 1)] * self.n_max
+            rad_vals_expanded = np.repeat(rad_vals, repeats, axis=1)
 
-        return rad_vals_expanded * ang_vals_expanded
+            ang_vals_expanded = np.tile(ang_vals, (1, self.n_max))
+
+            total_val += rad_vals_expanded * ang_vals_expanded
+        
+        return total_val
 
 
     def __len__(self):
@@ -205,6 +216,31 @@ class RIBasis(RIFunctions):
 
         m = idx - count
         return n, l, m - l
+
+
+    def _resolve_cutoff(self, cutoff: Cutoff) -> float | None:
+        if cutoff == CutoffType.NON_PERIODIC:
+            return None
+        if cutoff == CutoffType.ESTIMATE:
+            return self.radial_funcs.estimate_cutoff()
+        if isinstance(cutoff, (int, float)):
+            return float(cutoff)
+        raise TypeError(f"Invalid cutoff type: {type(cutoff)}")
+
+
+    def _get_lattice_vectors(self) -> np.ndarray:
+        if self.cell_vectors is None or self.cutoff is None:
+            return np.array([[0, 0, 0]])
+
+        inv_cell = np.linalg.inv(self.cell_vectors)
+        max_indices = np.ceil(self.cutoff * np.linalg.norm(inv_cell, axis=0)).astype(int)
+        
+        n1, n2, n3 = np.mgrid[-max_indices[0]:max_indices[0]+1, -max_indices[1]:max_indices[1]+1, -max_indices[2]:max_indices[2]+1]
+        lattice_points = np.vstack([n1.ravel(), n2.ravel(), n3.ravel()]).T
+        
+        vectors = np.dot(lattice_points, self.cell_vectors)
+        
+        return vectors[np.linalg.norm(vectors, axis=1) <= self.cutoff]
 
 
 class RIBasisSet():
@@ -237,6 +273,12 @@ class RIBasisSet():
         A function that takes the parameters (species, origin, n_max, l_max, radial_method, angular_method, radial_kwargs,
         angular_kwargs) and returns an RIBasis object.
 
+    cutoff: float | None
+        Cutoff up to which periodicity of crystal is computed. When calling RIBasisSet, all basis functions within
+        the cutoff contribute to the computed results.
+
+        If set to None, the basis set will be treated as non-periodic.
+
     order_by_species: bool
         Whether to order the RIBasis objects in the final list by species. If False, the ordering will be the same as in
         the structure file.
@@ -251,13 +293,16 @@ class RIBasisSet():
     """
 
     def __init__(self, structure_file: str, specifications: dict | str,
-                 ribasis_loader: Callable, order_by_species: bool = False):
+                 ribasis_loader: Callable, cutoff: Cutoff = CutoffType.NON_PERIODIC, order_by_species: bool = False):
+        
         if isinstance(specifications, str):
             with open(specifications, 'r') as f:
                 specifications = json.load(f)
+                
         self.specifications = specifications
-        self.species_and_positions = self._load_structure(structure_file, return_ordered=order_by_species)
+        self.cell_vectors, self.species_and_positions = self._load_structure(structure_file, return_ordered=order_by_species)
         self.ribases = []
+        self.cutoff = cutoff
         self.loader_func = ribasis_loader
 
         for species, position in self.species_and_positions:
@@ -271,7 +316,7 @@ class RIBasisSet():
         if r.ndim != 2 or r.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
 
-        results = [ribasis(r) for ribasis in self.ribases]
+        results = [ribasis.compute(r) for ribasis in self.ribases]
         return np.hstack(results)
 
 
@@ -287,16 +332,47 @@ class RIBasisSet():
         return self.ribases[item]
 
 
+    def span(self, coefficients: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
+        """Returns a function that evaluates the linear combination of RIBasis functions defined by the input coefficients.
+
+        Parameters:
+        -----------
+        coefficients: array-like
+            A 1D array of coefficients, with length equal to the total number of RIBasis functions in the set.
+
+        Returns:
+        --------
+        A callable function that takes a (N, 3) array of cartesian points and returns a (N,) array of evaluations of the linear combination of RIBasis functions at those points.
+        """
+        coefficients = np.asarray(coefficients)
+        if coefficients.ndim != 1 or coefficients.shape[0] != sum(len(ribasis) for ribasis in self.ribases):
+            raise ValueError(f"Coefficients must be a 1D array with length equal to the total number of RIBasis functions ({sum(len(ribasis) for ribasis in self.ribases)}), got shape {coefficients.shape}")
+
+        def linear_combination(r: np.ndarray) -> np.ndarray:
+            r = np.ascontiguousarray(r)
+            if r.ndim != 2 or r.shape[1] != 3:
+                raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
+
+            results = [ribasis.compute(r) for ribasis in self.ribases]
+            combined = np.hstack(results)
+            return combined @ coefficients
+
+        return linear_combination
+
+
     @staticmethod
     def _load_structure(structure_file: str, return_ordered: bool) \
-            -> List[Tuple[str, Tuple[float, float, float]]]:
+            -> Tuple[np.ndarray, List[Tuple[str, Tuple[float, float, float]]]]:
+        """Loads the structure file using ASE, returns the untit cell vectors and list of atom species with position"""
+
         atoms = read(str(structure_file))
+        cell_vectors = atoms.cell
         species_list: List[Tuple[str, Tuple[float, float, float]]] = [(str(atom.symbol), tuple(atom.position)) for atom in atoms]
 
         if return_ordered:
             species_list.sort(key=lambda x: (x[0], x[1][2], x[1][0], x[1][1]))
 
-        return species_list
+        return cell_vectors, species_list
 
 
     def _load_ribasis(self, species: str, origin: tuple[float, float, float]) -> RIBasis:
@@ -304,5 +380,7 @@ class RIBasisSet():
         return self.loader_func(
             species=species,
             origin=origin,
+            cell_vectors=self.cell_vectors,
+            cutoff=self.cutoff,
             **specs
         )

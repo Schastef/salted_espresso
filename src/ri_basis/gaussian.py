@@ -50,6 +50,11 @@ class PrimitiveGaussianRadials(RadialFunctions):
             self.radials.append(radial_func)
 
 
+    def estimate_cutoff(self, threshold: float = 1e-6) -> float:
+        min_alpha = min(self.alphas.values())
+        return np.sqrt(-np.log(threshold) / min_alpha)
+
+
 
 class PrimitiveGaussian:
     """Primitive Gaussian radial function.

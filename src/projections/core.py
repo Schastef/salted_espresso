@@ -244,7 +244,7 @@ def compute_projectability(rho: DensityFunction, basis: RIBasisSet, expansion_co
     rho_proj = basis.span(expansion_coefficients)
 
     # We can use a single universal grid for this integration, similar to the projection coefficients.
-    r, w = _build_radial_grid(basis[0], n_radial_grid=512, initial_r_max=8.0, radial_cutoff=1e-10)
+    r, w = _build_radial_grid(basis[0], n_radial_grid=512, initial_r_max=8.0, radial_cutoff=20)
     grid_points = np.zeros((len(r), 3))
     grid_points[:, 0] = r
 

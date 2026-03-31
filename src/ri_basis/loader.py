@@ -2,6 +2,7 @@ from typing import Type, Any, Dict, Optional
 from .core import RIBasis, RadialFunctions, AngularFunctions
 from .gaussian import PrimitiveGaussianRadials
 from .real_spher_harmonic import RealSphericalHarmonics
+from .types import Cutoff, CutoffType
 
 RADIAL_REGISTRY: Dict[str, Type[RadialFunctions]] = {}
 
@@ -24,7 +25,9 @@ def load_basis(species: str,
                radial_method: str = "gaussian",
                angular_method: str = "real_spherical",
                radial_params: Optional[Dict[str, Any]] = None,
-               angular_params: Optional[Dict[str, Any]] = None) -> RIBasis:
+               angular_params: Optional[Dict[str, Any]] = None,
+               cell_vectors = None,
+               cutoff: Cutoff = CutoffType.ESTIMATE) -> RIBasis:
     """
     Load and initialize an RI Basis set based on the specified methods and parameters.
 
@@ -69,11 +72,14 @@ def load_basis(species: str,
     return RIBasis(species, origin, n_max, l_max,
                    radial_cls, angular_cls,
                    radial_kwargs=radial_params,
-                   angular_kwargs=angular_params)
+                   angular_kwargs=angular_params,
+                   cell_vectors=cell_vectors,
+                   cutoff=cutoff)
 
 
 def load_basis_set(structure_file: str,
                    specifications: dict | str,
+                   cutoff: Cutoff = CutoffType.NON_PERIODIC,
                    order_by_species: bool = False) -> "RIBasisSet":
     """
     Load a complete RI basis set for a given structure.
@@ -87,6 +93,8 @@ def load_basis_set(structure_file: str,
         Path to a structure file (e.g., .xyz, .cif).
     specifications : dict or str
         A dictionary or path to a JSON file with basis specifications for each species.
+    cutoff : Cutoff, optional
+        The cutoff strategy for periodic images. Can be a float, "estimate", or "non-periodic".
     order_by_species : bool, optional
         If True, order the basis functions by species (default is False).
 
@@ -96,4 +104,4 @@ def load_basis_set(structure_file: str,
         The constructed RI basis set.
     """
     from .core import RIBasisSet  # Local import to avoid circular dependency
-    return RIBasisSet(structure_file, specifications, load_basis, order_by_species)
+    return RIBasisSet(structure_file, specifications, load_basis, cutoff=cutoff, order_by_species=order_by_species)
