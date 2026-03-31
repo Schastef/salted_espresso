@@ -18,7 +18,7 @@ class RIFunctions:
         r_arr = np.ascontiguousarray(r)
         if r_arr.ndim != 2 or r_arr.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r_arr.shape}")
-        return self.__call__(r_arr)
+        return self.__call__(r_arr - self.origin)
 
 
     def __call__(self, r: np.ndarray) -> np.ndarray:
