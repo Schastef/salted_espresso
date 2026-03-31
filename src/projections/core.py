@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal, List
+from typing import Literal
 
 import numpy as np
 
 from .utils import (_parse_method,
                     _radial_extent,
                     _build_radial_grid,
-                    _overlap_radial_block,
-                    _coulomb_radial_block,
                     _compute_single_basis_overlap,
                     MetricMethod)
 
@@ -213,45 +211,79 @@ def solve_projection_equations(
 
 
 _sentinel = object()  # Unique sentinel value for uninitialized variables
-def compute_projectability(rho: DensityFunction, basis: RIBasisSet, expansion_coefficients: np.array = _sentinel) -> float:
-    """Calculates the projectability of the density onto the basis.
 
-    Using the expansion coefficients, the RIBasis will be spanned to create the projected density, rho_proj.
-    The projectability is then defined as:
+def compute_projectability(
+    rho: DensityFunction,
+    basis: RIBasis | RIBasisSet,
+    expansion_coefficients: np.ndarray | object = _sentinel,
+    *,
+    n_radial_grid: int = 512,
+    initial_r_max: float = 8.0,
+    radial_cutoff: float = 1e-10,
+    rcond: float = 1e-12,
+    clip_tolerance: float = 1e-8,
+) -> float:
+    """Calculate projectability P = ||rho_proj||^2 / ||rho||^2.
 
-        P = (integral |rho_proj(r)|^2 dr) / (integral |rho(r)|^2 dr)
-
-    Parameters:
-    -----------
-    rho: DensityFunction
-        The target electronic density function to be projected.
-    basis: RIBasisSet
-        The RI basis set onto which the density is projected.
-    expansion_coefficients: np.ndarray, optional
-        The expansion coefficients obtained from solving the projection equations. If not provided, it will be computed.
+    This implementation computes an explicit weighted least-squares projection on
+    the same quadrature grid used for the norm, so it is consistent for
+    non-orthonormal bases and numerically stable.
     """
+    if isinstance(basis, RIBasis):
+        bases = [basis]
+    else:
+        bases = list(basis)
 
-    if expansion_coefficients is _sentinel:
-        projection_coefficients = compute_projection_coefficients(rho, basis)
-        overlap_matrix = compute_overlap(basis, method="overlap")
-        expansion_coefficients = solve_projection_equations(overlap_matrix, projection_coefficients)
+    if not bases:
+        return 0.0
 
-    rho_proj = basis.span(expansion_coefficients)
+    max_r = 0.0
+    for single_basis in bases:
+        max_r = max(max_r, _radial_extent(single_basis, initial_r_max, radial_cutoff))
 
-    # We can use a single universal grid for this integration, similar to the projection coefficients.
-    r, w = _build_radial_grid(basis[0], n_radial_grid=512, initial_r_max=8.0, radial_cutoff=20)
-    grid_points = np.zeros((len(r), 3))
+    r, w = _build_radial_grid(bases[0], n_radial_grid, max_r, radial_cutoff)
+    grid_points = np.zeros((len(r), 3), dtype=float)
     grid_points[:, 0] = r
 
-    rho_on_grid = rho(grid_points)
-    rho_proj_on_grid = rho_proj(grid_points)
+    rho_on_grid = np.asarray(rho(grid_points), dtype=float)
+    basis_on_grid = np.asarray(basis(grid_points), dtype=float)
 
-    integrand_proj = np.abs(rho_proj_on_grid)**2 * 4 * np.pi * r**2 * w
-    integrand_rho = np.abs(rho_on_grid)**2 * 4 * np.pi * r**2 * w
+    if basis_on_grid.ndim != 2 or basis_on_grid.shape[0] != grid_points.shape[0]:
+        raise ValueError(
+            "Basis evaluation must return shape (N_grid, N_basis), "
+            f"got {basis_on_grid.shape} for N_grid={grid_points.shape[0]}."
+        )
 
-    integral_proj = np.sum(integrand_proj)
-    integral_rho = np.sum(integrand_rho)
+    weights = np.clip(4.0 * np.pi * (r ** 2) * w, a_min=0.0, a_max=None)
+    sqrt_w = np.sqrt(weights)
 
-    return integral_proj / integral_rho if integral_rho > 0 else 0.0
+    y_w = rho_on_grid * sqrt_w
+    a_w = basis_on_grid * sqrt_w[:, None]
 
+    if expansion_coefficients is _sentinel:
+        coeffs, *_ = np.linalg.lstsq(a_w, y_w, rcond=rcond)
+    else:
+        coeffs = np.asarray(expansion_coefficients, dtype=float).reshape(-1)
+        if coeffs.shape[0] != basis_on_grid.shape[1]:
+            raise ValueError(
+                "expansion_coefficients must have length equal to total basis size "
+                f"({basis_on_grid.shape[1]}), got {coeffs.shape[0]}."
+            )
 
+    rho_proj_w = a_w @ coeffs
+
+    numerator = float(np.dot(rho_proj_w, rho_proj_w))
+    denominator = float(np.dot(y_w, y_w))
+
+    if denominator <= 0.0:
+        return 0.0
+
+    projectability = numerator / denominator
+
+    # Clamp tiny floating-point excursions outside [0, 1].
+    if -clip_tolerance < projectability < 0.0:
+        projectability = 0.0
+    elif 1.0 < projectability < 1.0 + clip_tolerance:
+        projectability = 1.0
+
+    return float(projectability)

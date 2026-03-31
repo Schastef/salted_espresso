@@ -177,6 +177,7 @@ class RIBasis(RIFunctions):
         total_val = np.zeros((r.shape[0], len(self)))
 
         for G in self.lattice_vectors:
+            # __call__ takes absolute coordinates; each periodic image is centered at origin + G.
             r_shifted = r - self.origin - G
             rad_vals = self.radial_funcs(r_shifted)  # Shape (N, n_rad_pairs)
             ang_vals = self.angular_funcs(r_shifted) # Shape (N, n_ang_funcs)
@@ -316,7 +317,8 @@ class RIBasisSet():
         if r.ndim != 2 or r.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
 
-        results = [ribasis.compute(r) for ribasis in self.ribases]
+        # Pass absolute coordinates to each basis; RIBasis handles origin internally.
+        results = [ribasis(r) for ribasis in self.ribases]
         return np.hstack(results)
 
 
@@ -353,7 +355,8 @@ class RIBasisSet():
             if r.ndim != 2 or r.shape[1] != 3:
                 raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
 
-            results = [ribasis.compute(r) for ribasis in self.ribases]
+            # Keep the same absolute-coordinate convention as RIBasisSet.__call__.
+            results = [ribasis(r) for ribasis in self.ribases]
             combined = np.hstack(results)
             return combined @ coefficients
 
