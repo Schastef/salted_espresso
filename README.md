@@ -25,7 +25,7 @@ pip install -e .
 src/
     electronic_density/   # Parse output of QM codes and create a callable \rho(r) from it
     ri_basis/             # Construct / Select auxiliary basis sets for resolution of identity (RI) 
-    density_fitting/      # Project \rho(r) onto RI basis, create output for SALTED training
+    projections/          # Project \rho(r) onto RI basis, create output for SALTED training
 tests/
     data/                 # small reference datasets
 ```
