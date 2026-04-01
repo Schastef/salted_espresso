@@ -93,6 +93,23 @@ def load_basis_set(structure_file: str,
         Path to a structure file (e.g., .xyz, .cif).
     specifications : dict or str
         A dictionary or path to a JSON file with basis specifications for each species.
+        Example for H2O (do not copy, as the alpha parameters are just arbitrary):
+        {
+            "H": {
+                "n_max": 2,
+                "l_max": 1,
+                "radial_method": "gaussian",
+                "angular_method": "real_spherical",
+                "radial_params": {"alphas": [0.5, 1.0, 1.5, 2.0]},
+            },
+            "O": {
+                "n_max": 2,
+                "l_max": 2,
+                "radial_method": "gaussian",
+                "angular_method": "real_spherical",
+                "radial_params": {"alphas": [0.5, 1.0, 1.5, 2.0]},
+            },
+        }
     cutoff : Cutoff, optional
         The cutoff strategy for periodic images. Can be a float, "estimate", or "non-periodic".
     order_by_species : bool, optional
