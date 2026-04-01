@@ -1,6 +1,9 @@
 # salted-espresso
 
-Tools to construct **callable real-space electron densities** from quantum-chemistry / electronic-structure outputs.
+Tools to 
+- construct **callable real-space electron densities** from quantum-chemistry / electronic-structure outputs
+- construct atom centered basis sets composed of a radial and spherical component
+- project electron densities onto atomic basis sets
 
 ## Installation (developer mode)
 
