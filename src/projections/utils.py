@@ -104,7 +104,7 @@ def _compute_single_basis_overlap(
     Computes the overlap matrix for a single RIBasis instance.
     This is a helper function for compute_overlap.
     """
-    n_max = ri_basis.n_max
+    n_max_by_l = ri_basis.n_max
     l_max = ri_basis.l_max
     n_basis = len(ri_basis)
 
@@ -119,14 +119,22 @@ def _compute_single_basis_overlap(
     )
 
     # Precompute radial values grouped by angular momentum l:
-    # shape per l is (n_max, n_radial_grid)
+    # shape per l is (n_max[l], n_radial_grid)
     radial_values_by_l: dict[int, np.ndarray] = {}
     for l in range(l_max + 1):
-        funcs = [ri_basis.radial_funcs.radials[n * (l_max + 1) + l] for n in range(n_max)]
+        n_l = n_max_by_l[l]
+        if n_l == 0:
+            continue
+        funcs = [
+            ri_basis.radial_funcs.radials[ri_basis.radial_funcs.lexographic_to_running_index((n, l))]
+            for n in range(n_l)
+        ]
         radial_values_by_l[l] = np.stack([func(r) for func in funcs], axis=0)
 
     radial_blocks: dict[int, np.ndarray] = {}
     for l in range(l_max + 1):
+        if l not in radial_values_by_l:
+            continue
         if method == MetricMethod.OVERLAP:
             radial_blocks[l] = _overlap_radial_block(radial_values_by_l[l], r=r, w=w)
         else:
@@ -135,9 +143,12 @@ def _compute_single_basis_overlap(
     matrix = np.zeros((n_basis, n_basis), dtype=float)
 
     for l in range(l_max + 1):
+        if l not in radial_blocks:
+            continue
         radial_block = radial_blocks[l]
+        n_l = n_max_by_l[l]
         for m in range(-l, l + 1):
-            indices = [ri_basis.lexographic_to_running_index((n, l, m)) for n in range(n_max)]
+            indices = [ri_basis.lexographic_to_running_index((n, l, m)) for n in range(n_l)]
             for i_local, i_global in enumerate(indices):
                 matrix[i_global, indices] = radial_block[i_local, :]
 

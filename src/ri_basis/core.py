@@ -6,6 +6,35 @@ from typing import List, Tuple, Callable, Iterator
 from .types import Cutoff, CutoffType
 
 
+def normalize_n_max(n_max: int | List[int], l_max: int) -> List[int]:
+    """Return n_max as a validated list with one entry per l in [0, l_max]."""
+    if isinstance(n_max, int):
+        if n_max < 0:
+            raise ValueError(f"n_max must be non-negative, got {n_max}.")
+        return [n_max for _ in range(l_max + 1)]
+
+    n_max_list = [int(value) for value in n_max]
+    if len(n_max_list) != l_max + 1:
+        raise ValueError(
+            f"If n_max is a list, it must have length l_max + 1 ({l_max + 1}), "
+            f"but got {len(n_max_list)}."
+        )
+    if any(value < 0 for value in n_max_list):
+        raise ValueError(f"All n_max entries must be non-negative, got {n_max_list}.")
+    return n_max_list
+
+
+def enumerate_nl_pairs(n_max_by_l: List[int]) -> List[Tuple[int, int]]:
+    """Enumerate valid (n, l) pairs in lexographic order: n slow, l fast."""
+    pairs: List[Tuple[int, int]] = []
+    max_n = max(n_max_by_l, default=0)
+    for n in range(max_n):
+        for l, n_l in enumerate(n_max_by_l):
+            if n < n_l:
+                pairs.append((n, l))
+    return pairs
+
+
 class RIFunctions:
     """Base class for RI basis functions, providing common attributes and methods for radial, angular and combined functions.
     """
@@ -48,10 +77,12 @@ class RadialFunctions(RIFunctions):
     Calling RadialFunctions with a cartesian point R will give a list of floats, representing the evaulations R_{n,l}(r) in lexographic order.
     """
 
-    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int):
+    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int | List[int], l_max: int):
         super().__init__(species, origin)
-        self.n_max = n_max
+        self.n_max = normalize_n_max(n_max, l_max)
         self.l_max = l_max
+        self._nl_pairs = enumerate_nl_pairs(self.n_max)
+        self._nl_to_idx = {nl: idx for idx, nl in enumerate(self._nl_pairs)}
         self.radials = []  # Expected to be populated by subclasses
 
 
@@ -73,20 +104,22 @@ class RadialFunctions(RIFunctions):
 
 
     def __len__(self):
-        return self.n_max * (self.l_max + 1)
+        return len(self._nl_pairs)
 
     def estimate_cutoff(self, threshold: float = 1e-6) -> float:
         raise NotImplementedError
 
     def lexographic_to_running_index(self, index: tuple) -> int:
         n, l = index
-        return n * (self.l_max + 1) + l
+        if (n, l) not in self._nl_to_idx:
+            raise ValueError(f"Invalid radial index (n={n}, l={l}) for n_max={self.n_max}.")
+        return self._nl_to_idx[(n, l)]
 
 
     def running_to_lexographic_index(self, idx: int) -> tuple:
-        n = idx // (self.l_max + 1)
-        l = idx % (self.l_max + 1)
-        return n, l
+        if idx < 0 or idx >= len(self._nl_pairs):
+            raise IndexError(f"Radial running index out of range: {idx}")
+        return self._nl_pairs[idx]
 
 
 class AngularFunctions(RIFunctions):
@@ -140,7 +173,9 @@ class RIBasis(RIFunctions):
     -----------
         species (str): Chemical species associated with the basis
         origin (tuple[float, float, float]): Origin of all basis functions
-        n_max (int): Maximum major quantum number for basis functions
+        n_max (int | List[int]): Maximum major quantum number for basis functions
+            As int, same number is used for all l
+            As list, each l can be assigned its own n_max
         l_max (int): Maximum minor quantum number for basis functions
 
         radial_cls: Class of RadialFunctions, implementing the radial part of the basis
@@ -149,13 +184,21 @@ class RIBasis(RIFunctions):
         angular_kwards: Key-word arguments passed to AngularFunction
     """
 
-    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max: int,
+    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int | List[int], l_max: int,
                  radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions],
                  radial_kwargs: dict = None, angular_kwargs: dict = None,
                  cell_vectors: np.ndarray = None, cutoff: Cutoff = CutoffType.NON_PERIODIC):
         super().__init__(species, origin)
-        self.n_max = n_max
+
+        self.n_max = normalize_n_max(n_max, l_max)
         self.l_max = l_max
+        self._nl_pairs = enumerate_nl_pairs(self.n_max)
+        self._nl_to_idx = {nl: idx for idx, nl in enumerate(self._nl_pairs)}
+        self._angular_offsets = np.cumsum([0] + [2 * l + 1 for l in range(self.l_max + 1)])
+
+        block_sizes = [2 * l + 1 for _, l in self._nl_pairs]
+        self._basis_offsets = np.cumsum([0] + block_sizes)
+        self._basis_size = int(self._basis_offsets[-1])
 
         self.radial_kwargs = radial_kwargs or {}
         self.angular_kwargs = angular_kwargs or {}
@@ -163,7 +206,7 @@ class RIBasis(RIFunctions):
         self.cell_vectors = cell_vectors
         
         # Instantiate radial and angular components
-        self.radial_funcs = radial_cls(species, origin, n_max, l_max, **self.radial_kwargs)
+        self.radial_funcs = radial_cls(species, origin, self.n_max, l_max, **self.radial_kwargs)
         self.angular_funcs = angular_cls(species, origin, l_max, **self.angular_kwargs)
 
         self.cutoff = self._resolve_cutoff(cutoff)
@@ -174,7 +217,7 @@ class RIBasis(RIFunctions):
         if r.ndim != 2 or r.shape[1] != 3:
             raise ValueError(f"Input must be an array of shape (N, 3), got {r.shape}")
 
-        total_val = np.zeros((r.shape[0], len(self)))
+        total_val = np.zeros((r.shape[0], self._basis_size))
 
         for G in self.lattice_vectors:
             # __call__ takes absolute coordinates; each periodic image is centered at origin + G.
@@ -182,41 +225,42 @@ class RIBasis(RIFunctions):
             rad_vals = self.radial_funcs(r_shifted)  # Shape (N, n_rad_pairs)
             ang_vals = self.angular_funcs(r_shifted) # Shape (N, n_ang_funcs)
 
-            repeats = [2 * l + 1 for l in range(self.l_max + 1)] * self.n_max
-            rad_vals_expanded = np.repeat(rad_vals, repeats, axis=1)
+            for radial_idx, (_, l) in enumerate(self._nl_pairs):
+                angular_start = self._angular_offsets[l]
+                angular_end = self._angular_offsets[l + 1]
+                basis_start = self._basis_offsets[radial_idx]
+                basis_end = self._basis_offsets[radial_idx + 1]
 
-            ang_vals_expanded = np.tile(ang_vals, (1, self.n_max))
-
-            total_val += rad_vals_expanded * ang_vals_expanded
+                total_val[:, basis_start:basis_end] += (
+                    rad_vals[:, radial_idx:radial_idx + 1] * ang_vals[:, angular_start:angular_end]
+                )
         
         return total_val
 
 
     def __len__(self):
-        return self.n_max * (self.l_max+1)**2
+        return self._basis_size
 
 
     def lexographic_to_running_index(self, index: tuple) -> int:
         n, l, m = index
-        return n * sum(2 * l_ + 1 for l_ in range(self.l_max + 1)) + sum(2 * l_ + 1 for l_ in range(l)) + (m + l)
+        if (n, l) not in self._nl_to_idx:
+            raise ValueError(f"Invalid basis index (n={n}, l={l}) for n_max={self.n_max}.")
+        if m < -l or m > l:
+            raise ValueError(f"Invalid magnetic index m={m} for l={l}.")
+
+        pair_idx = self._nl_to_idx[(n, l)]
+        return int(self._basis_offsets[pair_idx] + (m + l))
 
 
     def running_to_lexographic_index(self, idx: int) -> tuple:
-        n = 0
-        count = 0
-        while count + sum(2 * l_ + 1 for l_ in range(self.l_max + 1)) <= idx:
-            count += sum(2 * l_ + 1 for l_ in range(self.l_max + 1))
-            n += 1
+        if idx < 0 or idx >= self._basis_size:
+            raise IndexError(f"Basis running index out of range: {idx}")
 
-        idx -= count
-        l = 0
-        count = 0
-        while count + (2 * l + 1) <= idx:
-            count += 2 * l + 1
-            l += 1
-
-        m = idx - count
-        return n, l, m - l
+        pair_idx = int(np.searchsorted(self._basis_offsets, idx, side="right") - 1)
+        n, l = self._nl_pairs[pair_idx]
+        local_m = idx - int(self._basis_offsets[pair_idx])
+        return n, l, local_m - l
 
 
     def _resolve_cutoff(self, cutoff: Cutoff) -> float | None:

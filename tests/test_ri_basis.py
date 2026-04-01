@@ -15,10 +15,13 @@ from salted_espresso.ri_basis.realspherharmonic import RealSphericalHarmonics
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_basis(n_max: int, l_max: int, origin=(0.0, 0.0, 0.0),
+def _make_basis(n_max: int | list[int], l_max: int, origin=(0.0, 0.0, 0.0),
                 alpha: float = 1.0) -> RIBasis:
     """Convenience factory that creates a Gaussian/spherical RI basis."""
-    n_alphas = n_max * (l_max + 1)
+    if isinstance(n_max, int):
+        n_alphas = n_max * (l_max + 1)
+    else:
+        n_alphas = sum(n_max)
     return load_basis(
         species="H",
         origin=origin,
@@ -204,6 +207,18 @@ class TestPrimitiveGaussianRadials:
         # r=1: exp(-0.1) > exp(-5), so rad_small > rad_large
         assert rad_small(r)[0, 0] > rad_large(r)[0, 0]
 
+    def test_n_max_list_support(self):
+        rad = PrimitiveGaussianRadials(
+            "H",
+            (0.0, 0.0, 0.0),
+            [2, 1, 0],
+            2,
+            alphas=[0.5, 0.6, 1.0],
+        )
+        assert rad.n_max == [2, 1, 0]
+        assert len(rad) == 3
+        assert rad.running_to_lexographic_index(2) == (1, 0)
+
 
 # ---------------------------------------------------------------------------
 # RealSphericalHarmonics
@@ -359,6 +374,20 @@ class TestRIBasis:
         v_large = abs(b_large(r)[0, 0])
         # exp(-0.1) > exp(-5) after normalisation
         assert v_small > v_large
+
+    def test_n_max_list_support(self):
+        basis = _make_basis(n_max=[2, 1, 0], l_max=2)
+        assert basis.n_max == [2, 1, 0]
+        assert len(basis) == 5
+        expected = [
+            (0, 0, 0),
+            (0, 1, -1),
+            (0, 1, 0),
+            (0, 1, 1),
+            (1, 0, 0),
+        ]
+        for idx, nlm in enumerate(expected):
+            assert basis.running_to_lexographic_index(idx) == nlm
 
 
 # ---------------------------------------------------------------------------

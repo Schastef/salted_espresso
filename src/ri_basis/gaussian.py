@@ -30,7 +30,8 @@ class PrimitiveGaussianRadials(RadialFunctions):
             (alpha(1,0), alpha(1,1), alpha(2,0), alpha(2,1), ...)    
     """
 
-    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int, l_max, alphas: list[float] | Dict[Tuple[int, int], float]):
+    def __init__(self, species: str, origin: tuple[float, float, float], n_max: int | list[int], l_max: int,
+                 alphas: list[float] | Dict[Tuple[int, int], float]):
         super().__init__(species, origin, n_max, l_max)
 
         if isinstance(alphas, list):
@@ -42,9 +43,12 @@ class PrimitiveGaussianRadials(RadialFunctions):
             if set(alphas.keys()) != expected_keys:
                 raise ValueError(f"Expected keys {expected_keys} for alphas dict, but got {set(alphas.keys())}.")
             self.alphas = alphas
+        else:
+            raise TypeError("alphas must be provided as a list or dict keyed by (n, l).")
 
         self.radials = []
-        for (n, l) in self.alphas:
+        for idx in range(len(self)):
+            n, l = self.running_to_lexographic_index(idx)
             alpha = self.alphas[(n, l)]
             radial_func = PrimitiveGaussian(alpha, l)
             self.radials.append(radial_func)

@@ -20,7 +20,7 @@ def register_angular(name: str, cls: Type[AngularFunctions]):
 
 def load_basis(species: str,
                origin: tuple[float, float, float],
-               n_max: int,
+               n_max: int | list[int],
                l_max: int,
                radial_method: str = "gaussian",
                angular_method: str = "real_spherical",
@@ -37,8 +37,10 @@ def load_basis(species: str,
         Chemical species label (e.g. 'O', 'H').
     origin : tuple[float, float, float]
         Center of the basis functions.
-    n_max : int
-        Maximum radial quantum number (exclusive, i.e., number of radial functions).
+    n_max : int | list[int]
+        Maximum radial quantum number(s), interpreted as counts per angular momentum channel.
+        If int, the same count is used for all l in [0, l_max].
+        If list, ``n_max[l]`` is used for each l and the list must have length ``l_max + 1``.
     l_max : int
         Maximum angular momentum quantum number (inclusive).
     radial_method : str, optional

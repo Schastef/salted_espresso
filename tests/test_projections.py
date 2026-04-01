@@ -221,7 +221,7 @@ class TestComputeProjectability:
         b = compute_projection_coefficients(_gaussian_density, basis_set,
                                             n_radial_grid=256)
         c = solve_projection_equations(M, b)
-        proj = compute_projectability(_gaussian_density, basis_set,
+        proj, _ = compute_projectability(_gaussian_density, basis_set,
                                       expansion_coefficients=c)
         assert np.isfinite(proj)
         assert proj >= 0.0
@@ -232,7 +232,7 @@ class TestComputeProjectability:
         basis_set = _make_basis_set(n_max=1, l_max=0, alpha=1.0)
         # The basis Gaussian and the density Gaussian have the same alpha,
         # so the projection onto the single s-function should be near-perfect.
-        proj = compute_projectability(_gaussian_density, basis_set)
+        proj, _ = compute_projectability(_gaussian_density, basis_set)
         assert abs(proj - 1.0) < 0.01
 
     def test_projectability_with_precomputed_coefficients(self):
@@ -243,7 +243,7 @@ class TestComputeProjectability:
         b = compute_projection_coefficients(_gaussian_density, basis_set,
                                             n_radial_grid=256)
         c = solve_projection_equations(M, b)
-        proj_pre = compute_projectability(_gaussian_density, basis_set,
+        proj_pre, _ = compute_projectability(_gaussian_density, basis_set,
                                           expansion_coefficients=c)
-        proj_auto = compute_projectability(_gaussian_density, basis_set)
+        proj_auto, _ = compute_projectability(_gaussian_density, basis_set)
         assert abs(proj_pre - proj_auto) < 1e-6
