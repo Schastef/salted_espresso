@@ -222,12 +222,19 @@ def compute_projectability(
     radial_cutoff: float = 1e-10,
     rcond: float = 1e-12,
     clip_tolerance: float = 1e-8,
-) -> float:
+) -> tuple[float, np.ndarray]:
     """Calculate projectability P = ||rho_proj||^2 / ||rho||^2.
 
     This implementation computes an explicit weighted least-squares projection on
     the same quadrature grid used for the norm, so it is consistent for
     non-orthonormal bases and numerically stable.
+
+    Returns:
+    --------
+    P: float
+        Projectability
+    coeffs: np.ndarray
+        The expansion coefficients of the projection of rho onto the basis.
     """
     if isinstance(basis, RIBasis):
         bases = [basis]
@@ -286,4 +293,4 @@ def compute_projectability(
     elif 1.0 < projectability < 1.0 + clip_tolerance:
         projectability = 1.0
 
-    return float(projectability)
+    return float(projectability), coeffs
