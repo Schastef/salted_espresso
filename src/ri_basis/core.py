@@ -263,8 +263,7 @@ class RIBasisSet():
                 "l_max": 2,
                 "radial_method": "gaussian",
                 "angular_method": "real_spherical",
-                "radial_kwargs": {"alphas": [0.5, 1.0]},
-                "angular_kwargs": {}
+                "radial_params": {"alphas": [0.5, 1.0]},
             },
         }
 
