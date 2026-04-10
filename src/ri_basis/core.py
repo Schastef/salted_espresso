@@ -80,6 +80,7 @@ class RadialFunctions(RIFunctions):
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int | List[int], l_max: int):
         super().__init__(species, origin)
         self.n_max = normalize_n_max(n_max, l_max)
+        #print(self.n_max)
         self.l_max = l_max
         self._nl_pairs = enumerate_nl_pairs(self.n_max)
         self._nl_to_idx = {nl: idx for idx, nl in enumerate(self._nl_pairs)}
