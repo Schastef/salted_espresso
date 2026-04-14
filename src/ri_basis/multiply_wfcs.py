@@ -61,7 +61,7 @@ def multiply_spherical_harmonics(l1 : int, m1 : int, l2 : int, m2: int) -> Calla
 def compute_radial_overlap(r1: Callable, r2: Callable, r_max: float, n_points: int) -> float:
     r = np.linspace(0, r_max, n_points)
     integrand = r1(r) * r2(r) * r**2
-    return np.trapz(integrand, r)
+    return np.trapezoid(integrand, r)
 
 
 def select_l1l2(l_prime: int) -> list[tuple[int, int]]:
@@ -192,13 +192,13 @@ class Atomic_Rad(RadialFunctions):
         ## sort radials by lprime and save without the lprime index -> we trust that the functions are assigned correctly based on ordering
 
 
-    def __call__(self, r: np.ndarray) -> np.ndarray:
-        r_arr = np.asarray(r)
-        radii = np.linalg.norm(r_arr, axis=1)  
+  #  def __call__(self, r: np.ndarray) -> np.ndarray:
+  #      r_arr = np.asarray(r)
+  #      radii = np.linalg.norm(r_arr, axis=1)
 
-        result = np.squeeze(np.array([radial_func(radii) for radial_func in self.radials]))
+  #      result = np.squeeze(np.array([radial_func(radii) for radial_func in self.radials]))
 
-        return result
+  #      return result
     
     def estimate_cutoff(self, threshold: float = 1e-5) -> float:
         r = np.linspace(0, 20.0, 1000)

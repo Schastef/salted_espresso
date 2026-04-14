@@ -86,7 +86,7 @@ class PrimitiveGaussian:
         self.amplitude = self._compute_norm_amplitude("analytical")
 
 
-    def __call__(self, r: np.ndarray) -> np.ndarray:
+    def __call__(self, r: float | np.ndarray) -> float | np.ndarray:
         r_arr = np.asarray(r)
 
         result = self.amplitude * np.exp(-self.alpha * r_arr**2) * r_arr**self.l
