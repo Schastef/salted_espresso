@@ -1,6 +1,6 @@
 from .loader import load_basis, load_basis_set, register_angular, register_radial
 from .gaussian import PrimitiveGaussianRadials
-from .multiply_wfcs import Atomic_Rad
+from .atomic import Atomic_Rad
 from .real_spher_harmonic import RealSphericalHarmonics
 
 
