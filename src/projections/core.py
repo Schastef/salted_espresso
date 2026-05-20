@@ -103,7 +103,7 @@ def compute_projection_coefficients(
     target_density: DensityFunction,
     ri_basis_set: RIBasis | RIBasisSet,
     *,
-    n_radial_grid: int = 512,
+    n_cartesian_grid: int = 64,
     initial_r_max: float = 8.0,
     cutoff: float = 1e-10,
 ) -> np.ndarray:
@@ -125,8 +125,8 @@ def compute_projection_coefficients(
         The target electronic density to be projected.
     ri_basis_set: RIBasis or RIBasisSet
         The RI basis or basis set onto which to project the target density.
-    n_radial_grid: int
-        Number of points for the radial quadrature grid.
+    n_cartesian_grid: int
+        Number of points for the cartesian quadrature grid in each dimension.
     initial_r_max: float
         Initial guess for the maximum radius of the grid.
     cutoff: float
@@ -148,12 +148,11 @@ def compute_projection_coefficients(
         max_r = max(max_r, _radial_extent(basis, initial_r_max, cutoff))
 
     # 2. Build a single universal grid for the integration
-    # We use a temporary dummy basis to build the grid.
-    r, w = _build_radial_grid(bases[0], n_radial_grid, max_r, cutoff)
+    axes, w = _build_cartesian_grid(bases[0], n_cartesian_grid, max_r, cutoff)
 
     # Create a 3D grid of points for evaluation
-    grid_points = np.zeros((len(r), 3))
-    grid_points[:, 0] = r
+    gridx, gridy, gridz = np.meshgrid(axes, axes, axes, indexing='ij')
+    grid_points = np.vstack([gridx.ravel(), gridy.ravel(), gridz.ravel()]).T
 
     # 3. Evaluate the density and the entire basis set ONCE on this grid
     print("Evaluating density on the universal grid...")
@@ -163,21 +162,11 @@ def compute_projection_coefficients(
     basis_on_grid = ri_basis_set(grid_points) # Shape: (n_grid_points, n_total_basis_funcs)
 
     # 4. Perform the integration in a vectorized manner
-    # The integral is integral(rho(r) * chi_i(r) * 4pi * r^2 dr)
-    # This is simplified for s-functions (l=0), which is what we project onto.
-    # The basis_on_grid contains all chi_i(r), so we can do this with a matrix-vector product.
+    # The integration weights for the cartesian integral
+    integrand_weights = np.outer(np.outer(w, w), w).ravel()
 
-    # The integration weights for the radial integral
-    integrand_weights = 4 * np.pi * r**2 * w
-
-    # The dot product sums over the grid points (the first axis)
-    # (n_total_basis_funcs, n_grid_points) @ (n_grid_points,) -> (n_total_basis_funcs,)
     print("Performing vectorized integration...")
     coeffs = basis_on_grid.T @ (density_on_grid * integrand_weights)
-
-    # The current implementation of basis functions only returns non-zero values for s-orbitals
-    # when the input is purely radial. If it were a full 3D evaluation, we would need to
-    # filter for the s-orbitals here. For now, the zeros are implicitly handled.
 
     print("Done.")
     return coeffs
@@ -217,11 +206,12 @@ def compute_projectability(
     basis: RIBasis | RIBasisSet,
     expansion_coefficients: np.ndarray | object = _sentinel,
     *,
-    n_radial_grid: int = 512,
+    n_cartesian_grid: int = 64,
     initial_r_max: float = 8.0,
-    radial_cutoff: float = 1e-10,
+    cutoff: float = 1e-10,
     rcond: float = 1e-12,
     clip_tolerance: float = 1e-8,
+    verbose: bool = False,
 ) -> tuple[float, np.ndarray]:
     """Calculate projectability P = ||rho_proj||^2 / ||rho||^2.
 
@@ -242,17 +232,26 @@ def compute_projectability(
         bases = list(basis)
 
     if not bases:
-        return 0.0
+        return 0.0, np.array([])
+
+    if verbose:
+        print("Estimating radial extend")
 
     max_r = 0.0
     for single_basis in bases:
-        max_r = max(max_r, _radial_extent(single_basis, initial_r_max, radial_cutoff))
+        max_r = max(max_r, _radial_extent(single_basis, initial_r_max, cutoff))
 
-    r, w = _build_radial_grid(bases[0], n_radial_grid, max_r, radial_cutoff)
-    grid_points = np.zeros((len(r), 3), dtype=float)
-    grid_points[:, 0] = r
+    if verbose:
+        print("BUilding grid")
+    axes, w = _build_cartesian_grid(bases[0], n_cartesian_grid, max_r, cutoff)
+    gridx, gridy, gridz = np.meshgrid(axes, axes, axes, indexing='ij')
+    grid_points = np.vstack([gridx.ravel(), gridy.ravel(), gridz.ravel()]).T
 
+    if verbose:
+        print("Evaluating density on grid")
     rho_on_grid = np.asarray(rho(grid_points), dtype=float)
+    if verbose:
+        print("Evaluating basis on grid")
     basis_on_grid = np.asarray(basis(grid_points), dtype=float)
 
     if basis_on_grid.ndim != 2 or basis_on_grid.shape[0] != grid_points.shape[0]:
@@ -261,7 +260,10 @@ def compute_projectability(
             f"got {basis_on_grid.shape} for N_grid={grid_points.shape[0]}."
         )
 
-    weights = np.clip(4.0 * np.pi * (r ** 2) * w, a_min=0.0, a_max=None)
+    if verbose:
+        print("Calculating weights")
+    weights = np.outer(np.outer(w, w), w).ravel()
+    weights = np.clip(weights, a_min=0.0, a_max=None)
     sqrt_w = np.sqrt(weights)
 
     y_w = rho_on_grid * sqrt_w
@@ -277,13 +279,15 @@ def compute_projectability(
                 f"({basis_on_grid.shape[1]}), got {coeffs.shape[0]}."
             )
 
+    if verbose:
+        print("Solving linear equation")
     rho_proj_w = a_w @ coeffs
 
     numerator = float(np.dot(rho_proj_w, rho_proj_w))
     denominator = float(np.dot(y_w, y_w))
 
     if denominator <= 0.0:
-        return 0.0
+        return 0.0, coeffs
 
     projectability = numerator / denominator
 
@@ -295,80 +299,3 @@ def compute_projectability(
 
     return float(projectability), coeffs
 
-def compute_projectability_cart(    rho: DensityFunction,
-    basis: RIBasis | RIBasisSet,
-    expansion_coefficients: np.ndarray | object = _sentinel,
-    *,
-    n_grid: int = 512,
-    initial_r_max: float = 8.0,
-    cutoff: float = 1e-10,
-    rcond: float = 1e-12,
-    clip_tolerance: float = 1e-8,
-) -> tuple[float, np.ndarray]:
-    """Calculate projectability P = ||rho_proj||^2 / ||rho||^2.
-
-    This implementation computes an explicit weighted least-squares projection on
-    the same quadrature grid used for the norm, so it is consistent for
-    non-orthonormal bases and numerically stable. It does not assume spherical symmetry and can handle full 3D basis evaluations, by integrating over a Cartesian grid.
-
-    Returns:
-    --------
-    P: float
-        Projectability
-    coeffs: np.ndarray
-        The expansion coefficients of the projection of rho onto the basis.
-    """
-
-    if isinstance(basis, RIBasis):
-        bases = [basis]
-    else:
-        bases = list(basis)
-
-    if not bases:
-        return 0.0, np.array([])
-
-    # max_r = 0.0
-    # for single_basis in bases:
-    #     max_r = max(max_r, _radial_extent(single_basis, initial_r_max, cutoff))
-
-    max_r = initial_r_max
-
-    gridpoints, w = _build_cartesian_grid(bases[0], n_grid, max_r, cutoff)
-
-    grid = np.meshgrid(gridpoints, gridpoints, gridpoints, indexing='xy')
-
-    grid_2d = np.vstack(list(map(np.ravel, grid))).T
-    #print("done building grid, shape:", grid_2d.shape)
-
-
-    rho_on_grid = rho(grid_2d)
-    #print("Calculated density on grid, shape:", rho_on_grid.shape)
-    basis_on_grid = basis(grid_2d)
-    #print("Calculated basis on grid, shape:", basis_on_grid.shape)
-    sqrt_w = np.sqrt(np.outer(np.outer(w, w), w)).reshape(-1)  # Shape: (N_grid^3,)
-    #sqrt_w = np.ones_like(rho_on_grid)
-
-    y_w = rho_on_grid * sqrt_w
-    a_w = basis_on_grid * sqrt_w[:, None]
-
-    if expansion_coefficients is _sentinel:
-        coeffs, *_ = np.linalg.lstsq(a_w, y_w, rcond=rcond)
-    else:
-        coeffs = np.asarray(expansion_coefficients, dtype=float).reshape(-1)
-        if coeffs.shape[0] != basis_on_grid.shape[1]:
-            raise ValueError(
-                "expansion_coefficients must have length equal to total basis size "
-                f"({basis_on_grid.shape[1]}), got {coeffs.shape[0]}."
-            )
-
-    rho_proj_w = a_w @ coeffs
-
-    numerator = float(np.dot(rho_proj_w, rho_proj_w))
-    denominator = float(np.dot(y_w, y_w))
-
-    if denominator <= 0.0:
-        return 0.0, coeffs
-
-    projectability = numerator / denominator
-
-    return float(projectability), coeffs

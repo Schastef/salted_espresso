@@ -99,7 +99,7 @@ class TestComputeConditionNumber:
 
     def test_result_is_at_least_one(self):
         basis = _make_basis(n_max=2, l_max=1)
-        M = compute_overlap(basis, method="overlap", n_radial_grid=256)
+        M = compute_overlap(basis, method="overlap", n_cartesian_grid=256)
         cond = compute_condition_number(M)
         assert cond >= 1.0 - 1e-10
 
@@ -162,21 +162,21 @@ class TestComputeProjectionCoefficients:
     def test_output_shape_single_basis(self):
         basis = _make_basis(n_max=1, l_max=0)
         coeffs = compute_projection_coefficients(
-            _gaussian_density, basis, n_radial_grid=64
+            _gaussian_density, basis, n_cartesian_grid=64
         )
         assert coeffs.shape == (len(basis),)
 
     def test_output_shape_larger_basis(self):
         basis = _make_basis(n_max=2, l_max=1)
         coeffs = compute_projection_coefficients(
-            _gaussian_density, basis, n_radial_grid=64
+            _gaussian_density, basis, n_cartesian_grid=64
         )
         assert coeffs.shape == (len(basis),)
 
     def test_coefficients_are_finite(self):
         basis = _make_basis(n_max=1, l_max=0)
         coeffs = compute_projection_coefficients(
-            _gaussian_density, basis, n_radial_grid=64
+            _gaussian_density, basis, n_cartesian_grid=64
         )
         assert np.all(np.isfinite(coeffs))
 
@@ -184,7 +184,7 @@ class TestComputeProjectionCoefficients:
         basis = _make_basis(n_max=1, l_max=0)
         zero_density = lambda r: np.zeros(r.shape[0])
         coeffs = compute_projection_coefficients(
-            zero_density, basis, n_radial_grid=64
+            zero_density, basis, n_cartesian_grid=64
         )
         np.testing.assert_allclose(coeffs, 0.0, atol=1e-14)
 
@@ -192,7 +192,7 @@ class TestComputeProjectionCoefficients:
         """A spherically symmetric density must have a non-zero s-orbital coefficient."""
         basis = _make_basis(n_max=1, l_max=0)
         coeffs = compute_projection_coefficients(
-            _gaussian_density, basis, n_radial_grid=128
+            _gaussian_density, basis, n_cartesian_grid=128
         )
         idx = basis.lexographic_to_running_index((0, 0, 0))
         assert abs(coeffs[idx]) > 1e-6
@@ -202,7 +202,7 @@ class TestComputeProjectionCoefficients:
         basis_set = _make_basis_set(n_max=1, l_max=0, n_atoms=2)
         total_funcs = sum(len(b) for b in basis_set)
         coeffs = compute_projection_coefficients(
-            _gaussian_density, basis_set, n_radial_grid=64
+            _gaussian_density, basis_set, n_cartesian_grid=64
         )
         assert coeffs.shape == (total_funcs,)
 
@@ -217,9 +217,9 @@ class TestComputeProjectability:
     def test_projectability_is_finite_and_non_negative(self):
         """Projectability must be a finite non-negative number."""
         basis_set = _make_basis_set(n_max=1, l_max=0)
-        M = compute_overlap(basis_set, method="overlap", n_radial_grid=256)
+        M = compute_overlap(basis_set, method="overlap", n_cartesian_grid=256)
         b = compute_projection_coefficients(_gaussian_density, basis_set,
-                                            n_radial_grid=256)
+                                            n_cartesian_grid=256)
         c = solve_projection_equations(M, b)
         proj, _ = compute_projectability(_gaussian_density, basis_set,
                                       expansion_coefficients=c)
@@ -239,9 +239,9 @@ class TestComputeProjectability:
         """Passing precomputed expansion coefficients should yield the same result
         as computing them internally."""
         basis_set = _make_basis_set(n_max=1, l_max=0)
-        M = compute_overlap(basis_set, method="overlap", n_radial_grid=256)
+        M = compute_overlap(basis_set, method="overlap", n_cartesian_grid=256)
         b = compute_projection_coefficients(_gaussian_density, basis_set,
-                                            n_radial_grid=256)
+                                            n_cartesian_grid=256)
         c = solve_projection_equations(M, b)
         proj_pre, _ = compute_projectability(_gaussian_density, basis_set,
                                           expansion_coefficients=c)

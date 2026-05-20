@@ -9,7 +9,7 @@ import scipy.optimize
 
 from salted_espresso.ri_basis.core import RIBasis, RIBasisSet
 from salted_espresso.electronic_density.types import DensityFunction
-from salted_espresso.projections.core import compute_projectability_cart
+from salted_espresso.projections.core import compute_projectability
 
 
 """Iteratively optimize primitive Gaussian alphas to maximize projectability."""
@@ -204,10 +204,10 @@ def _evaluate(rho_path: Path, structure_path: Path, alphas_dict: dict[str, Seque
 
 	if verbose:
 		print("Computing projectability...")
-	projectability, expansion_coeffs = compute_projectability_cart(
+	projectability, expansion_coeffs = compute_projectability(
 		rho,
 		basis_set,
-		n_grid=grid.n_grid,
+		n_cartesian_grid=grid.n_grid,
 		initial_r_max=grid.initial_r_max,
 		cutoff=grid.cutoff,
 	)

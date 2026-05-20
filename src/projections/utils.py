@@ -311,7 +311,7 @@ def _compute_single_basis_overlap_cart(
     # ------------------------------------------------- evaluate basis on grid
     grid = np.meshgrid(axes, axes, axes, indexing='ij')  # (N, N, N)
     grid_2d = np.vstack(list(map(np.ravel, grid))).T  # (N^3, 3)
-    basis_values = ri_basis(grid_2d)  # (n_basis, N, N, N)
+    basis_values = ri_basis(grid_2d).T  # (n_basis, N^3)
 
     # --------------------------------------------------------- build matrix
     if method == MetricMethod.OVERLAP:
