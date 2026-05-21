@@ -84,13 +84,13 @@ def normalize_n_max(n_max: int | Sequence[int], l_max: int) -> List[int]:
 
 
 def _enumerate_nl_pairs(n_max_by_l: Sequence[int]) -> List[tuple[int, int]]:
-	pairs: List[tuple[int, int]] = []
-	max_n = max(n_max_by_l, default=0)
-	for n in range(max_n):
-		for l, n_l in enumerate(n_max_by_l):
-			if n < n_l:
-				pairs.append((n, l))
-	return pairs
+        pairs: List[tuple[int, int]] = []
+        max_n = max(n_max_by_l, default=0)
+        for n in range(1, max_n + 1):
+                for l, n_l in enumerate(n_max_by_l):
+                        if n <= n_l:
+                                pairs.append((n, l))
+        return pairs
 
 
 def generate_alphas(species_specs: dict[str, dict], *, beta: float = DEFAULT_BETA,
@@ -472,3 +472,4 @@ if __name__ == "__main__":
     
     
 #     pass
+

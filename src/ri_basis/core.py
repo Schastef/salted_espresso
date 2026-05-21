@@ -28,9 +28,9 @@ def enumerate_nl_pairs(n_max_by_l: List[int]) -> List[Tuple[int, int]]:
     """Enumerate valid (n, l) pairs in lexographic order: n slow, l fast."""
     pairs: List[Tuple[int, int]] = []
     max_n = max(n_max_by_l, default=0)
-    for n in range(max_n):
+    for n in range(1, max_n + 1):
         for l, n_l in enumerate(n_max_by_l):
-            if n < n_l:
+            if n <= n_l:
                 pairs.append((n, l))
     return pairs
 
