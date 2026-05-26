@@ -27,7 +27,7 @@ def _make_basis(n_max: int | list[int], l_max: int, origin=(0.0, 0.0, 0.0)) -> R
         l_max=l_max,
         radial_method="atomic",
         angular_method="spherical",
-        radial_params={"filename": "tests/data/Na_TZP_rc10.0_qe.dat"}
+        radial_params={"filename": "tests/data/atomic_densities/Na_TZP_rc10.0_qe.dat"}
     )
 
 

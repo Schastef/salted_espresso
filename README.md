@@ -56,7 +56,7 @@ rho = load_rho(path)
 from salted_espresso.electronic_density import load_rho
 import numpy as np
 
-rho = load_rho("tests/data/nvp_rho.cube")
+rho = load_rho("tests/data/cube_files/nvp_rho.cube")
 
 # single point
 val = rho(np.array([0.0, 0.0, 0.0]))
@@ -161,8 +161,8 @@ print(basis(r))
 import numpy as np
 from salted_espresso.ri_basis import load_basis_set
 
-structure_file = "./tests/data/nvp_rho.cube"
-specifications_file = "./tests/data/example_primitive_gaussian.json"
+structure_file = "./tests/data/cube_files/nvp_rho.cube"
+specifications_file = "./tests/data/example_radials/primitive_gaussian.json"
 
 basis_set = load_basis_set(structure_file, specifications_file)
 
