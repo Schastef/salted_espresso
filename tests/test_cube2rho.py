@@ -7,7 +7,7 @@ import pytest
 
 from salted_espresso.electronic_density import cube2rho
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent / "data" / "cube_files"
 CUBE_PATH = DATA_DIR / "nvp_rho.cube"
 
 

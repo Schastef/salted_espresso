@@ -1,24 +1,16 @@
-"""Compatibility namespace for RI basis modules."""
+from .loader import load_basis, load_basis_set, register_angular, register_radial
+from .gaussian import PrimitiveGaussianRadials
+from .atomic import Atomic_Rad
+from .real_spher_harmonic import RealSphericalHarmonics
 
-from importlib import import_module
-import sys
 
-_base = import_module("ri_basis")
+register_radial("gaussian", PrimitiveGaussianRadials)
+register_radial("atomic", Atomic_Rad)
 
-# Expose package contents.
-__all__ = getattr(_base, "__all__", [])
-__path__ = _base.__path__
-for _name in dir(_base):
-    if not _name.startswith("__"):
-        globals()[_name] = getattr(_base, _name)
+register_angular("spherical", RealSphericalHarmonics)
+register_angular("real_spherical", RealSphericalHarmonics)
 
-# Ensure namespaced submodules resolve to the same module objects.
-for _submodule in (
-    "core",
-    "loader",
-    "gaussian",
-    "real_spher_harmonic",
-    "realspherharmonic",
-    "types",
-):
-    sys.modules[f"{__name__}.{_submodule}"] = import_module(f"ri_basis.{_submodule}")
+__all__ = [
+    "load_basis",
+    "load_basis_set"
+]

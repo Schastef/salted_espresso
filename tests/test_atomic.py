@@ -9,7 +9,7 @@ import scipy.optimize
 
 from salted_espresso.ri_basis import load_basis
 from salted_espresso.ri_basis.core import AngularFunctions, RadialFunctions, RIBasis
-from salted_espresso.ri_basis.multiply_wfcs import Atomic_Rad
+from salted_espresso.ri_basis.atomic import Atomic_Rad
 from salted_espresso.ri_basis.realspherharmonic import RealSphericalHarmonics
 
 

@@ -5,15 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "salted-espresso"
 version = "0.1.0"
+description = "Tools to construct callable electronic densities from QM outputs"
+readme = "README.md"
 requires-python = ">=3.10"
+
 dependencies = [
     "numpy",
     "ase",
     "sphericart",
     "scipy",
 ]
-description = "Tools to construct callable electronic densities from QM outputs"
-readme = "README.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -23,13 +24,8 @@ where = ["src"]
 include = [
     "salted_espresso",
     "salted_espresso.*",
-    "electronic_density",
-    "electronic_density.*",
-    "ri_basis",
-    "ri_basis.*",
-    "projections",
-    "projections.*",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
