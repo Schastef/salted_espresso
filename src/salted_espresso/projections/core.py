@@ -30,11 +30,15 @@ def compute_projection_vector(
     X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
     points = np.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=-1)
 
-    P = np.zeros(len(basis_set))
+    P = None
     chunk_size = 10000
     for i in range(0, len(points), chunk_size):
         chunk = points[i:i+chunk_size]
-        P += (basis_set(chunk).T @ rho(chunk)) * dV
+        dP = (basis_set(chunk).T @ rho(chunk)) * dV
+        if P is None:
+            P = dP
+        else:
+            P += dP
 
     return P
 
