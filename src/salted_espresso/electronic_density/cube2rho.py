@@ -24,12 +24,15 @@ class RhoG:
     rho_g: np.ndarray
     G: np.ndarray
     grid_shape: tuple[int, int, int]
+    cell_grid: np.ndarray
 
 
 @dataclass
 class PlaneWaveDensity:
     rho_g: np.ndarray
     G: np.ndarray
+    cell_grid: np.ndarray = None
+    grid_shape: tuple[int, int, int] = None
     # Upper bound for temporary arrays used during rho(r) evaluation.
     max_batch_memory_mb: float = 64.0
     # Imaginary residual tolerated before treating the result as inconsistent.
@@ -225,10 +228,11 @@ def compute_rho_g(rho_r: npt.NDArray[np.floating], spacing: npt.NDArray[np.float
         rho_g=rho_G_flat,
         G=G_flat,
         grid_shape=grid_shape,
+        cell_grid=cell_matrix,
     )
 
 
 def load_rho_from_cube(path: Path) -> DensityFunction:
     cube_dict = load_cubefile(path)
     rhog = compute_rho_g(cube_dict["data"], cube_dict["spacing"])
-    return PlaneWaveDensity(rhog.rho_g, rhog.G)
+    return PlaneWaveDensity(rhog.rho_g, rhog.G, cell_grid=rhog.cell_grid, grid_shape=rhog.grid_shape)

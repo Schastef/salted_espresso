@@ -10,25 +10,36 @@ def compute_overlap_matrix(basis_set: RIBasisSet) -> np.ndarray:
 def compute_projection_vector(
     rho: DensityFunction,
     basis_set: RIBasisSet,
-    n_cartesian_grid: int = 64,
-    r_max: float = 8.0,
+    n_cartesian_grid: int | tuple[int, int, int] | None = None,
+    cell_grid: np.ndarray = None,
 ) -> np.ndarray:
     """Computes the individual projection coefficients P_i = <rho | chi_i> for the given density and basis set."""
-    if hasattr(basis_set, "ribases"):
-        origins = np.array([b.origin for b in basis_set])
-    else:
-        origins = np.array([basis_set.origin])
+    if cell_grid is None:
+        if hasattr(rho, "cell_grid") and rho.cell_grid is not None:
+            cell_grid = rho.cell_grid
+        else:
+            raise ValueError("cell_grid must be provided either as an argument or as an attribute of the density.")
 
-    min_bounds = origins.min(axis=0) - r_max
-    max_bounds = origins.max(axis=0) + r_max
+    if n_cartesian_grid is None:
+        if hasattr(rho, "grid_shape") and rho.grid_shape is not None:
+            n_cartesian_grid = rho.grid_shape
+        else:
+            n_cartesian_grid = (64, 64, 64)
 
-    x = np.linspace(min_bounds[0], max_bounds[0], n_cartesian_grid)
-    y = np.linspace(min_bounds[1], max_bounds[1], n_cartesian_grid)
-    z = np.linspace(min_bounds[2], max_bounds[2], n_cartesian_grid)
+    if isinstance(n_cartesian_grid, int):
+        n_cartesian_grid = (n_cartesian_grid, n_cartesian_grid, n_cartesian_grid)
 
-    dV = (x[1] - x[0]) * (y[1] - y[0]) * (z[1] - z[0])
-    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
-    points = np.stack([X.ravel(), Y.ravel(), Z.ravel()], axis=-1)
+    nx, ny, nz = n_cartesian_grid
+
+    f1 = np.linspace(0, 1, nx, endpoint=False)
+    f2 = np.linspace(0, 1, ny, endpoint=False)
+    f3 = np.linspace(0, 1, nz, endpoint=False)
+
+    dV = abs(np.linalg.det(cell_grid)) / (nx * ny * nz)
+    F1, F2, F3 = np.meshgrid(f1, f2, f3, indexing='ij')
+    frac_pts = np.stack([F1.ravel(), F2.ravel(), F3.ravel()], axis=-1)
+
+    points = frac_pts @ cell_grid
 
     P = None
     chunk_size = 10000
