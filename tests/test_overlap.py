@@ -46,9 +46,9 @@ def test_different_l_or_m_blocks_do_not_couple() -> None:
     basis = _make_basis(n_max=2, l_max=1)
     matrix = compute_overlap(basis, method="overlap", n_cartesian_grid=128)
 
-    idx_l0_m0 = basis.lexographic_to_running_index((0, 0, 0))
-    idx_l1_m0 = basis.lexographic_to_running_index((0, 1, 0))
-    idx_l1_m1 = basis.lexographic_to_running_index((0, 1, 1))
+    idx_l0_m0 = basis.lexographic_to_running_index((1, 0, 0))
+    idx_l1_m0 = basis.lexographic_to_running_index((1, 1, 0))
+    idx_l1_m1 = basis.lexographic_to_running_index((1, 1, 1))
 
     assert abs(matrix[idx_l0_m0, idx_l1_m0]) < 1e-14
     assert abs(matrix[idx_l1_m0, idx_l1_m1]) < 1e-14

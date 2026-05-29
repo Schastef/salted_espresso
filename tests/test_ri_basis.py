@@ -144,7 +144,7 @@ class TestPrimitiveGaussianRadials:
     def test_creation_with_dict_of_alphas(self):
         n_max, l_max = 2, 1
         alphas_dict = {(n, l): 1.0
-                       for n in range(n_max)
+                       for n in range(1, n_max + 1)
                        for l in range(l_max + 1)}
         rad = PrimitiveGaussianRadials("H", (0.0, 0.0, 0.0), n_max, l_max,
                                        alphas=alphas_dict)
@@ -217,8 +217,7 @@ class TestPrimitiveGaussianRadials:
         )
         assert rad.n_max == [2, 1, 0]
         assert len(rad) == 3
-        assert rad.running_to_lexographic_index(2) == (1, 0)
-
+        assert rad.running_to_lexographic_index(2) == (2, 0)
 
 # ---------------------------------------------------------------------------
 # RealSphericalHarmonics
@@ -324,11 +323,11 @@ class TestRIBasis:
     def test_known_index_values(self):
         """Spot-check specific (n,l,m) <-> index mappings for n_max=2, l_max=1."""
         basis = _make_basis(n_max=2, l_max=1)
-        # Expected lexographic order (n, l, m): n=0 block then n=1 block
-        # l=0: (0,0,0); l=1: (0,1,-1),(0,1,0),(0,1,1)
+        # Expected lexographic order (n, l, m): n=1 block then n=2 block
+        # l=0: (1,0,0); l=1: (1,1,-1),(1,1,0),(1,1,1)
         expected = [
-            (0, 0, 0), (0, 1, -1), (0, 1, 0), (0, 1, 1),
             (1, 0, 0), (1, 1, -1), (1, 1, 0), (1, 1, 1),
+            (2, 0, 0), (2, 1, -1), (2, 1, 0), (2, 1, 1),
         ]
         for idx, nlm in enumerate(expected):
             assert basis.running_to_lexographic_index(idx) == nlm, (
@@ -380,11 +379,11 @@ class TestRIBasis:
         assert basis.n_max == [2, 1, 0]
         assert len(basis) == 5
         expected = [
-            (0, 0, 0),
-            (0, 1, -1),
-            (0, 1, 0),
-            (0, 1, 1),
             (1, 0, 0),
+            (1, 1, -1),
+            (1, 1, 0),
+            (1, 1, 1),
+            (2, 0, 0),
         ]
         for idx, nlm in enumerate(expected):
             assert basis.running_to_lexographic_index(idx) == nlm

@@ -194,7 +194,7 @@ class TestComputeProjectionCoefficients:
         coeffs = compute_projection_coefficients(
             _gaussian_density, basis, n_cartesian_grid=128
         )
-        idx = basis.lexographic_to_running_index((0, 0, 0))
+        idx = basis.lexographic_to_running_index((1, 0, 0))
         assert abs(coeffs[idx]) > 1e-6
 
     def test_output_shape_for_basis_set(self):
