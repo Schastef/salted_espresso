@@ -22,7 +22,7 @@ def cube():
 
 
 @pytest.fixture(scope="module")
-def rho_obj():
+def rho_obj() -> cube2rho.PlaneWaveDensity:
     return cube2rho.load_rho_from_cube(CUBE_PATH)
 
 
@@ -126,6 +126,9 @@ class TestFftRoundtrip:
 
 
 class TestRhoReconstruction:
+    def test_fft_data_is_stored_on_loaded_density(self, cube, rho_obj):
+        np.testing.assert_allclose(rho_obj.fft_data, cube["data"])
+
     def test_invalid_r_shape_raises(self, rho_obj):
         with pytest.raises(ValueError):
             rho_obj(np.zeros((2, 2)))
@@ -256,3 +259,38 @@ class TestRhoReconstruction:
             assert rho_obj._batch_chunk_size() >= 1
         finally:
             rho_obj.max_batch_memory_mb = previous
+
+    def test_integrate_against_matches_manual_quadrature(self, cube, rho_obj):
+        rho_grid = cube["data"]
+        origin = np.asarray(cube["origin"], dtype=float)
+        step_matrix = np.asarray(rho_obj.cell_grid, dtype=float)
+        nx, ny, nz = rho_grid.shape
+
+        f1 = np.linspace(0, 1, nx, endpoint=False)
+        f2 = np.linspace(0, 1, ny, endpoint=False)
+        f3 = np.linspace(0, 1, nz, endpoint=False)
+        F1, F2, F3 = np.meshgrid(f1, f2, f3, indexing="ij")
+        frac_pts = np.stack((F1.ravel(), F2.ravel(), F3.ravel()), axis=-1)
+        points = origin + frac_pts @ step_matrix
+        dV = abs(np.linalg.det(step_matrix)) / (nx * ny * nz)
+
+        def vectorized_func(pts):
+            return np.sum(pts**2, axis=-1) + 0.25
+
+        rho_vals = np.asarray(rho_grid, dtype=float).ravel()
+        func_vals = np.asarray(vectorized_func(points), dtype=float).ravel()
+        expected = float(np.dot(rho_vals, func_vals) * dV)
+        actual = rho_obj.integrate_against(vectorized_func)
+        assert actual == pytest.approx(expected, abs=1e-10)
+
+        def scalar_only_func(point):
+            point = np.asarray(point, dtype=float)
+            if point.shape != (3,):
+                raise TypeError("scalar-only callable expects a single point")
+            return float(np.dot(point, point) + 0.25)
+
+        scalar_vals = np.array([scalar_only_func(point) for point in points], dtype=float)
+        scalar_expected = float(np.dot(rho_vals, scalar_vals) * dV)
+        scalar_actual = rho_obj.integrate_against(scalar_only_func)
+        assert scalar_actual == pytest.approx(scalar_expected, abs=1e-10)
+

@@ -33,6 +33,8 @@ class PlaneWaveDensity:
     G: np.ndarray
     cell_grid: np.ndarray = None
     grid_shape: tuple[int, int, int] = None
+    fft_data: np.ndarray = None
+    origin: np.ndarray = None
     # Upper bound for temporary arrays used during rho(r) evaluation.
     max_batch_memory_mb: float = 64.0
     # Imaginary residual tolerated before treating the result as inconsistent.
@@ -108,6 +110,59 @@ class PlaneWaveDensity:
                 raise ValueError(f"Each streamed point must have shape (3,), got {point_arr.shape} at index {index}")
             yield self._to_real_scalar(self._evaluate_single_point(point_arr))
 
+    def _quadrature_points(self) -> np.ndarray:
+        if self.cell_grid is None:
+            raise ValueError("cell_grid must be available to build the quadrature grid.")
+
+        grid_shape = self.grid_shape
+        if grid_shape is None:
+            if self.fft_data is None:
+                raise ValueError("grid_shape or fft_data must be available to build the quadrature grid.")
+            grid_shape = self.fft_data.shape
+
+        if self.origin is None:
+            raise ValueError("origin must be available to build the quadrature grid.")
+
+        nx, ny, nz = grid_shape
+        f1 = np.linspace(0, 1, nx, endpoint=False)
+        f2 = np.linspace(0, 1, ny, endpoint=False)
+        f3 = np.linspace(0, 1, nz, endpoint=False)
+        F1, F2, F3 = np.meshgrid(f1, f2, f3, indexing="ij")
+        frac_pts = np.stack((F1.ravel(), F2.ravel(), F3.ravel()), axis=-1)
+        return np.asarray(self.origin, dtype=float) + frac_pts @ np.asarray(self.cell_grid, dtype=float)
+
+    def integrate_against(self, func) -> float:
+        if self.fft_data is None:
+            raise ValueError("fft_data must be stored on the density object to integrate against a callable.")
+
+        points = self._quadrature_points()
+        density = np.asarray(self.fft_data, dtype=float).reshape(-1)
+        if density.size != points.shape[0]:
+            raise ValueError(
+                f"fft_data has {density.size} points, but the quadrature grid has {points.shape[0]} points."
+            )
+
+        try:
+            values = np.asarray(func(points))
+        except Exception:
+            values = np.asarray([func(point) for point in points])
+
+        if values.shape == ():
+            values = np.full(points.shape[0], values.item())
+        elif values.shape == self.grid_shape:
+            values = values.reshape(-1)
+        elif values.shape != (points.shape[0],):
+            if values.size == points.shape[0]:
+                values = values.reshape(-1)
+            else:
+                raise ValueError(
+                    "Callable must return a scalar, a grid-shaped array, or a flat array matching the quadrature grid."
+                )
+
+        dV = abs(np.linalg.det(np.asarray(self.cell_grid, dtype=float))) / points.shape[0]
+        integral = np.dot(density, values)
+        return float(integral) * dV
+
     def __call__(
         self,
         r: npt.NDArray[np.floating] | Iterable[object],
@@ -135,7 +190,10 @@ class PlaneWaveDensity:
 
     def memory_usage_mb(self) -> float:
         """Estimation of memory usage in megabytes to store the plane wave density data."""
-        return (self.rho_g.nbytes + self.G.nbytes) / (1024 * 1024)
+        total_bytes = self.rho_g.nbytes + self.G.nbytes
+        if self.fft_data is not None:
+            total_bytes += self.fft_data.nbytes
+        return total_bytes / (1024 * 1024)
 
 
 def load_cubefile(path: Path) -> CubeDict:
@@ -232,7 +290,14 @@ def compute_rho_g(rho_r: npt.NDArray[np.floating], spacing: npt.NDArray[np.float
     )
 
 
-def load_rho_from_cube(path: Path) -> DensityFunction:
+def load_rho_from_cube(path: Path) -> PlaneWaveDensity:
     cube_dict = load_cubefile(path)
     rhog = compute_rho_g(cube_dict["data"], cube_dict["spacing"])
-    return PlaneWaveDensity(rhog.rho_g, rhog.G, cell_grid=rhog.cell_grid, grid_shape=rhog.grid_shape)
+    return PlaneWaveDensity(
+        rhog.rho_g,
+        rhog.G,
+        cell_grid=rhog.cell_grid,
+        grid_shape=rhog.grid_shape,
+        fft_data=cube_dict["data"],
+        origin=cube_dict["origin"],
+    )
