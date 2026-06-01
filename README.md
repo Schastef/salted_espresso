@@ -157,12 +157,13 @@ print(basis(r))
 ```
 
 ### Quick Example: Load RIBasisSet from a structure
+
 ```python
 import numpy as np
 from salted_espresso.ri_basis import load_basis_set
 
 structure_file = "./tests/data/cube_files/nvp_rho.cube"
-specifications_file = "./tests/data/example_radials/primitive_gaussian.json"
+specifications_file = "tests/data/example_basis_sets/primitive_gaussian.json"
 
 basis_set = load_basis_set(structure_file, specifications_file)
 
