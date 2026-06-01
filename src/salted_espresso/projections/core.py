@@ -136,4 +136,23 @@ def compute_projection_vector_FFT(
 
 def solve_projections_coeffs(overlap_matrix: np.ndarray, projection_vector: np.ndarray) -> np.ndarray:
     """Solves the linear system S c = P to obtain the projection coefficients c_i."""
-    pass
+    M = np.asarray(overlap_matrix)
+    b = np.asarray(projection_vector)
+
+    if M.ndim != 2 or M.shape[0] != M.shape[1]:
+        raise ValueError(f"overlap_matrix must be square, got shape {M.shape}")
+    if b.ndim != 1 or b.shape[0] != M.shape[0]:
+        raise ValueError(f"projection_vector must be 1D with length {M.shape[0]}, got shape {b.shape}")
+
+    # Ensure symmetry (numerical noise may introduce tiny asymmetries)
+    M_sym = 0.5 * (M + M.T.conj())
+    # Cast near-real matrices to real for solver stability
+    M_sym = np.asarray(np.real_if_close(M_sym, tol=1000))
+
+    try:
+        x = np.linalg.solve(M_sym, b)
+    except np.linalg.LinAlgError:
+        # Fallback to least-squares / pseudo-inverse for singular or rank-deficient matrices
+        x, *_ = np.linalg.lstsq(M_sym, b, rcond=None)
+
+    return np.asarray(x, dtype=float)
