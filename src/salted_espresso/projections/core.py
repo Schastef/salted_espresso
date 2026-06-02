@@ -3,7 +3,9 @@ from typing import cast
 from salted_espresso.electronic_density.types import DensityFunction
 from salted_espresso.ri_basis.core import RIBasisSet
 
-def compute_overlap_matrix(basis_set: RIBasisSet) -> np.ndarray:
+from tqdm.auto import tqdm
+
+def compute_overlap_matrix(basis_set: RIBasisSet, print_progress_bar: bool = False) -> np.ndarray:
     """Computeds the overlap matrix S_ij = <chi_i | chi_j> for the given density and basis set."""
     cell_vectors = np.asarray(getattr(basis_set, "cell_vectors", None), dtype=float)
     if cell_vectors.size == 0:
@@ -33,7 +35,18 @@ def compute_overlap_matrix(basis_set: RIBasisSet) -> np.ndarray:
 
     overlap = np.zeros((n_basis, n_basis), dtype=np.complex128)
     chunk_size = 10000
-    for i in range(0, len(points), chunk_size):
+
+    iterator = range(0, len(points), chunk_size)
+
+    if print_progress_bar:
+        iterator = tqdm(
+            iterator,
+            total=len(iterator),
+            desc="Evaluating Overlap Matrix S",
+            unit="matrix element chunk",
+        )
+
+    for i in iterator:
         chunk = points[i:i + chunk_size]
         values = np.asarray(basis_set(chunk))
         overlap += values.conj().T @ values * dV
@@ -95,6 +108,7 @@ def compute_projection_vector(
 def compute_projection_vector_FFT(
     rho: DensityFunction,
     basis_set: RIBasisSet,
+    print_progress_bar: bool = False,
 ) -> np.ndarray:
     """Compute P_i = <rho | chi_i> on the density object's native FFT quadrature grid."""
     integrate_against = getattr(rho, "integrate_against", None)
@@ -119,7 +133,17 @@ def compute_projection_vector_FFT(
 
     projections = np.empty(n_basis, dtype=float)
 
-    for basis_index in range(n_basis):
+    iterator = range(n_basis)
+
+    if print_progress_bar:
+        iterator = tqdm(
+            iterator,
+            total=n_basis,
+            desc="Evaluating <rho | chi_i> integrals",
+            unit="integral",
+        )
+
+    for basis_index in iterator:
         def basis_component(points: np.ndarray, idx: int = basis_index) -> np.ndarray:
             values = np.asarray(basis_set(points))
             if values.ndim == 1:
