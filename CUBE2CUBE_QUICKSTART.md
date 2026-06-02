@@ -9,7 +9,7 @@ python3 cube2cube.py input.cube basis_spec.json output.cube
 
 ## What is cube2cube?
 
-The cube2cube script takes an electron density from a .cube file, projects it onto a resolution of identity (RI) basis set, and writes the reconstructed density to a new .cube file.
+The cube2cube script takes an electron density from a .cube file, projects it onto a resolution of identity (RI) basis set, and writes the reconstructed density to a new .cube file. It also exports the overlap matrix, the projection vector and the projection coefficients as .npy files in the same directory as the .cube file.
 
 ## Step 1: Prepare Your Basis Set Specification
 
@@ -58,11 +58,10 @@ Create a JSON file defining your basis functions for each atom type:
 ## Step 2: Run the Script
 
 ```bash
-python3 cube2cube.py co2.cube basis.json co2_projected.cube
+python3 cube2cube.py co2.cube basis.json output_dir
 ```
 
 **Optional flags:**
-- `--structure-file structure.xyz`: Provide explicit atomic structure
 - `--overwrite`: Overwrite existing output file
 
 ## Step 3: Review the Output
@@ -76,8 +75,8 @@ Max absolute difference: 7.440164e+00
 RMS difference: 3.918894e-01
 ```
 
-✓ If reconstructed integral is close to original, projection was good
-✓ RMS difference shows average error per grid point
+If reconstructed integral is close to original, projection was good
+RMS difference shows average error per grid point
 
 ## Common Use Cases
 
@@ -90,7 +89,7 @@ echo '{
           "angular_method": "real_spherical", "radial_params": {"alphas": [1.0]}}
 }' > minimal.json
 
-python3 cube2cube.py structure.cube minimal.json output.cube
+python3 cube2cube.py structure.cube minimal.json output_dir
 ```
 
 ### Project with custom structure file
@@ -112,35 +111,3 @@ done
 - For `n_max=2, l_max=0`: Need 2 alphas
 - For `n_max=2, l_max=1`: Need 4 alphas
 - For `n_max=2, l_max=2`: Need 6 alphas
-
-### "Overlap matrix condition number: inf"
-**Solution:** Missing or zero cell vectors. Try:
-```bash
-python3 cube2cube.py input.cube basis.json output.cube --structure-file structure.xyz
-
-
-### Reconstructed density is all zeros
-**Solution:** Reduce basis complexity or use different alphas:
-```json
-{"n_max": 1, "l_max": 0, "radial_params": {"alphas": [0.5, 1.0, 1.5]}}
-```
-
-## Files Location
-
-- **Script**: `salted_espresso/cube2cube.py`
-- **This guide**: `salted_espresso/CUBE2CUBE_QUICKSTART.md`
-
-## Key Functions Used (from salted_espresso)
-
-| Function | Purpose |
-|----------|---------|
-| `load_rho_from_cube()` | Load density from .cube file |
-| `compute_overlap_matrix()` | Calculate basis overlap S_ij |
-| `compute_projection_vector_FFT()` | Project density onto basis |
-| `solve_projections_coeffs()` | Solve S·c = P for coefficients |
-| `basis_set.span()` | Create reconstructed density function |
-
-## Examples
-
-See `/tmp/test_basis_simple.json` for a working example that uses the CO₂ test file.
-
