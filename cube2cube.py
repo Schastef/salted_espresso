@@ -54,8 +54,7 @@ from salted_espresso.ri_basis.types import CutoffType
 
 
 def reconstruct_density_on_grid(
-    rho_original,
-    basis_set,
+    rho_function,
     grid_shape: tuple,
     cell_grid: np.ndarray,
     origin: np.ndarray
@@ -64,8 +63,7 @@ def reconstruct_density_on_grid(
     Reconstruct the projected density on the original grid.
 
     Args:
-        rho_original: Original PlaneWaveDensity object
-        basis_set: RIBasisSet object
+        rho_function: Callable representing rho
         grid_shape: Shape of the original grid (nx, ny, nz)
         cell_grid: Cell vectors as (3, 3) array
         origin: Origin of the grid in Cartesian coordinates
@@ -86,7 +84,7 @@ def reconstruct_density_on_grid(
     points = origin + frac_pts @ np.asarray(cell_grid, dtype=float)
 
     # Evaluate the reconstructed density at all grid points
-    rho_reconstructed = rho_original(points)
+    rho_reconstructed = rho_function(points)
 
     # Reshape back to grid
     return rho_reconstructed.reshape(grid_shape)
@@ -174,10 +172,9 @@ def cube2cube(
     print("Evaluating reconstructed density on original grid...")
     rho_reconstructed_grid = reconstruct_density_on_grid(
         rho_reconstructed_func,
-        basis_set,
         rho_original.grid_shape,
         rho_original.cell_grid,
-        rho_original.origin
+        rho_original.origin,
     )
 
     # Step 9: Write to cube file
