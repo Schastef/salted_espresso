@@ -12,7 +12,7 @@ This script performs the following operations:
 7. Write reconstructed density back to a .cube file
 
 Usage:
-    python cube2cube.py <input.cube> <basis_spec.json> <output.cube> [--structure-file <structure.xyz>]
+    python cube2cube.py <input.cube> <basis_spec.json> <output.cube>
 
 The basis specification file should contain definitions for each atomic species.
 Example structure for a single atom at the origin:
@@ -51,30 +51,6 @@ from salted_espresso.projections.core import (
 )
 from salted_espresso.ri_basis.loader import load_basis_set
 from salted_espresso.ri_basis.types import CutoffType
-
-
-def infer_structure_from_cube(cube_path: Path) -> Path:
-    """
-    Create a temporary structure file from cube file atomic information.
-
-    Args:
-        cube_path: Path to the .cube file
-
-    Returns:
-        Path to a temporary .xyz file
-    """
-    cube_dict = load_cubefile(cube_path)
-    atoms = cube_dict["atoms"]
-
-    # Create temporary .xyz file
-    temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.xyz', delete=False)
-    temp_path = temp_file.name
-
-    # Use ASE to write the structure
-    ase_read(str(cube_path), format='cube').write(temp_path, format='xyz')
-    temp_file.close()
-
-    return Path(temp_path)
 
 
 def reconstruct_density_on_grid(
@@ -120,7 +96,6 @@ def cube2cube(
     input_cube: Path,
     basis_spec: Path,
     output_cube: Path,
-    structure_file: Optional[Path] = None,
     overwrite: bool = False,
 ) -> None:
     """
@@ -130,7 +105,6 @@ def cube2cube(
         input_cube: Path to input .cube file
         basis_spec: Path to basis set specification (.json or .yaml)
         output_cube: Path to output .cube file
-        structure_file: Path to structure file for basis set. If None, inferred from cube.
         overwrite: Whether to overwrite existing output file
     """
     input_cube = Path(input_cube)
@@ -154,21 +128,10 @@ def cube2cube(
     print(f"Grid shape: {rho_original.grid_shape}")
     print(f"Cell vectors:\n{rho_original.cell_grid}")
 
-    # Step 2: Infer or use provided structure file
-    if structure_file is None:
-        print("Inferring structure from cube file...")
-        structure_file = infer_structure_from_cube(input_cube)
-        temp_structure = True
-    else:
-        structure_file = Path(structure_file)
-        temp_structure = False
-
-    print(f"Using structure file: {structure_file}")
-
     # Step 3: Load basis set
     print(f"Loading basis set from: {basis_spec}")
     basis_set = load_basis_set(
-        str(structure_file),
+        input_cube,
         str(basis_spec),
         cutoff=CutoffType.NON_PERIODIC,
         order_by_species=False
@@ -238,10 +201,6 @@ def cube2cube(
     print(f"Max absolute difference: {np.max(np.abs(rho_original.fft_data - rho_reconstructed_grid)):.6e}")
     print(f"RMS difference: {np.sqrt(np.mean((rho_original.fft_data - rho_reconstructed_grid) ** 2)):.6e}")
 
-    # Cleanup temporary file if created
-    if temp_structure:
-        Path(structure_file).unlink()
-
 
 def main():
     """Command-line interface."""
@@ -267,12 +226,6 @@ def main():
         help="Path to output .cube file"
     )
     parser.add_argument(
-        "--structure-file",
-        type=str,
-        default=None,
-        help="Path to structure file (e.g., .xyz). If not provided, inferred from cube file."
-    )
-    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite output file if it exists"
@@ -284,7 +237,6 @@ def main():
         input_cube=args.input_cube,
         basis_spec=args.basis_spec,
         output_cube=args.output_cube,
-        structure_file=args.structure_file,
         overwrite=args.overwrite,
     )
 
