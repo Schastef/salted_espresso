@@ -29,6 +29,7 @@ Example structure for a single atom at the origin:
 """
 
 import argparse
+import os
 import json
 import tempfile
 from pathlib import Path
@@ -52,12 +53,11 @@ from salted_espresso.projections.core import (
 from salted_espresso.ri_basis.loader import load_basis_set
 from salted_espresso.ri_basis.types import CutoffType
 
-
 def reconstruct_density_on_grid(
     rho_function,
     grid_shape: tuple,
     cell_grid: np.ndarray,
-    origin: np.ndarray
+    origin: np.ndarray,
 ) -> np.ndarray:
     """
     Reconstruct the projected density on the original grid.
@@ -93,7 +93,7 @@ def reconstruct_density_on_grid(
 def cube2cube(
     input_cube: Path,
     basis_spec: Path,
-    output_cube: Path,
+    output_dir: Path,
     overwrite: bool = False,
 ) -> None:
     """
@@ -102,20 +102,20 @@ def cube2cube(
     Args:
         input_cube: Path to input .cube file
         basis_spec: Path to basis set specification (.json or .yaml)
-        output_cube: Path to output .cube file
+        output_dir: Path to directory where to store outputs
         overwrite: Whether to overwrite existing output file
     """
     input_cube = Path(input_cube)
     basis_spec = Path(basis_spec)
-    output_cube = Path(output_cube)
+    output_dir = Path(output_dir)
 
     if not input_cube.exists():
         raise FileNotFoundError(f"Input cube file not found: {input_cube}")
     if not basis_spec.exists():
         raise FileNotFoundError(f"Basis specification file not found: {basis_spec}")
-    if output_cube.exists() and not overwrite:
+    if output_dir.exists() and not overwrite:
         raise FileExistsError(
-            f"Output cube file already exists: {output_cube}. Use --overwrite to replace."
+            f"Output directory file already exists: {output_dir}. Use --overwrite to replace."
         )
 
     print(f"Loading electron density from: {input_cube}")
@@ -177,8 +177,15 @@ def cube2cube(
         rho_original.origin,
     )
 
+
+    # Writing output files
+    cube_file_path = os.path.join(output_dir, "rho.cube")
+    overlap_matrix_path = os.path.join(output_dir, "overlap_matrix.npy")
+    projection_vector_path = os.path.join(output_dir, "projection_vector.npy")
+    coefficients_path = os.path.join(output_dir, "coefficients.npy")
+
     # Step 9: Write to cube file
-    print(f"Writing reconstructed density to: {output_cube}")
+    print(f"Writing reconstructed density to: {cube_file_path}")
 
     # Prepare atoms object
     atoms = cube_dict["atoms"]
@@ -186,8 +193,17 @@ def cube2cube(
     origin = cube_dict["origin"]
 
     # Write cube file using ASE
-    with open(output_cube, 'w') as f:
+    with open(cube_file_path, 'w') as f:
         write_cube(f, atoms, data=rho_reconstructed_grid.T)
+
+    print(f"Writing overlap matrix to: {overlap_matrix_path}")
+    np.save(overlap_matrix_path, overlap_matrix)
+
+    print(f"Writing projection vector to: {projection_vector_path}")
+    np.save(projection_vector_path, projection_vector)
+
+    print(f"Writing coefficients to: {coefficients_path}")
+    np.save(coefficients_path, projection_coeffs)
 
     print("Done!")
 
@@ -218,9 +234,9 @@ def main():
         help="Path to basis set specification (.json or .yaml file)"
     )
     parser.add_argument(
-        "output_cube",
+        "output_dir",
         type=str,
-        help="Path to output .cube file"
+        help="Path to directory where to store output"
     )
     parser.add_argument(
         "--overwrite",
@@ -233,7 +249,7 @@ def main():
     cube2cube(
         input_cube=args.input_cube,
         basis_spec=args.basis_spec,
-        output_cube=args.output_cube,
+        output_dir=args.output_dir,
         overwrite=args.overwrite,
     )
 
