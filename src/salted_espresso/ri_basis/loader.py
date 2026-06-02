@@ -22,12 +22,13 @@ def load_basis(species: str,
                origin: tuple[float, float, float],
                n_max: int | list[int],
                l_max: int,
-               radial_method: str = "gaussian",
-               angular_method: str = "real_spherical",
+               radial_method: str,
+               angular_method: str,
+               cutoff: Cutoff,
                radial_params: Optional[Dict[str, Any]] = None,
                angular_params: Optional[Dict[str, Any]] = None,
                cell_vectors = None,
-               cutoff: Cutoff = CutoffType.ESTIMATE) -> RIBasis:
+               ) -> RIBasis:
     """
     Load and initialize an RI Basis set based on the specified methods and parameters.
 
@@ -79,9 +80,9 @@ def load_basis(species: str,
                    cutoff=cutoff)
 
 
-def load_basis_set(structure_file: str,
+def load_basis_set(rho_origin_file: str,
                    specifications: dict | str,
-                   cutoff: Cutoff = CutoffType.NON_PERIODIC,
+                   cutoff: Cutoff,
                    order_by_species: bool = False) -> "RIBasisSet":
     """
     Load a complete RI basis set for a given structure.
@@ -91,8 +92,8 @@ def load_basis_set(structure_file: str,
 
     Parameters
     ----------
-    structure_file : str
-        Path to a structure file (e.g., .xyz, .cif).
+    rho_origin_file: str
+        Path to file from which electronic density was created (e.g. .cube file)
     specifications : dict or str
         A dictionary or path to a JSON file with basis specifications for each species.
         Example for H2O (do not copy, as the alpha parameters are just arbitrary):
@@ -112,7 +113,7 @@ def load_basis_set(structure_file: str,
                 "radial_params": {"alphas": [0.5, 1.0, 1.5, 2.0]},
             },
         }
-    cutoff : Cutoff, optional
+    cutoff : Cutoff
         The cutoff strategy for periodic images. Can be a float, "estimate", or "non-periodic".
     order_by_species : bool, optional
         If True, order the basis functions by species (default is False).
@@ -123,4 +124,4 @@ def load_basis_set(structure_file: str,
         The constructed RI basis set.
     """
     from .core import RIBasisSet  # Local import to avoid circular dependency
-    return RIBasisSet(structure_file, specifications, load_basis, cutoff=cutoff, order_by_species=order_by_species)
+    return RIBasisSet(rho_origin_file, specifications, load_basis, cutoff=cutoff, order_by_species=order_by_species)

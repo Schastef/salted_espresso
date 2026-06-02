@@ -186,9 +186,9 @@ class RIBasis(RIFunctions):
     """
 
     def __init__(self, species: str, origin: tuple[float, float, float], n_max: int | List[int], l_max: int,
-                 radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions],
+                 radial_cls: type[RadialFunctions], angular_cls: type[AngularFunctions], cutoff: Cutoff,
                  radial_kwargs: dict = None, angular_kwargs: dict = None,
-                 cell_vectors: np.ndarray = None, cutoff: Cutoff = CutoffType.NON_PERIODIC):
+                 cell_vectors: np.ndarray = None):
         super().__init__(species, origin)
 
         self.n_max = normalize_n_max(n_max, l_max)
@@ -275,8 +275,11 @@ class RIBasis(RIFunctions):
 
 
     def _get_lattice_vectors(self) -> np.ndarray:
-        if self.cell_vectors is None or self.cutoff is None:
+        if self.cutoff is None:
             return np.array([[0, 0, 0]])
+
+        if self.cell_vectors is None or np.linalg.det(self.cell_vectors) == 0:
+            raise ValueError("Cell vector is singular, even though cell is treated as periodic (cutofftype is not NON_PERIODIC)")
 
         inv_cell = np.linalg.inv(self.cell_vectors)
         max_indices = np.ceil(self.cutoff * np.linalg.norm(inv_cell, axis=0)).astype(int)
@@ -295,11 +298,11 @@ class RIBasisSet():
     Parameters
     ----------
 
-    structure_file: str
-        Path to a structure file (e.g. .xyz, .cif) containing the structural information. Read with ase.io.read
+    rho_origin_file: str
+        Path to file from which electronic density is generated (e.g. .cube file)
     specifications: dict | str
         A dictionary mapping chemical species to their basis specifications. The basis specifications correspond
-        directly to the parameters of RIBasis, except for species and origin which are determined from the structure file
+        directly to the parameters of RIBasis, except for species and origin which are determined from the .cube file.
         For example:
 
         {
@@ -326,7 +329,7 @@ class RIBasisSet():
 
     order_by_species: bool
         Whether to order the RIBasis objects in the final list by species. If False, the ordering will be the same as in
-        the structure file.
+        the rho origin file.
 
     Methods:
     --------
@@ -337,15 +340,15 @@ class RIBasisSet():
 
     """
 
-    def __init__(self, structure_file: str, specifications: dict | str,
-                 ribasis_loader: Callable, cutoff: Cutoff = CutoffType.NON_PERIODIC, order_by_species: bool = False):
+    def __init__(self, rho_origin_file: str, specifications: dict | str,
+                 ribasis_loader: Callable, cutoff: Cutoff, order_by_species: bool = False):
         
         if isinstance(specifications, str):
             with open(specifications, 'r') as f:
                 specifications = json.load(f)
                 
         self.specifications = specifications
-        self.cell_vectors, self.species_and_positions = self._load_structure(structure_file, return_ordered=order_by_species)
+        self.cell_vectors, self.species_and_positions = self._load_structure(rho_origin_file, return_ordered=order_by_species)
         self.ribases = []
         self.cutoff = cutoff
         self.loader_func = ribasis_loader
@@ -408,11 +411,11 @@ class RIBasisSet():
 
 
     @staticmethod
-    def _load_structure(structure_file: str, return_ordered: bool) \
+    def _load_structure(rho_origin_file: str, return_ordered: bool) \
             -> Tuple[np.ndarray, List[Tuple[str, Tuple[float, float, float]]]]:
         """Loads the structure file using ASE, returns the untit cell vectors and list of atom species with position"""
 
-        atoms = read(str(structure_file))
+        atoms = read(str(rho_origin_file))
         cell_vectors = atoms.cell
         species_list: List[Tuple[str, Tuple[float, float, float]]] = [(str(atom.symbol), tuple(atom.position)) for atom in atoms]
 
