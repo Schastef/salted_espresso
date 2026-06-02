@@ -267,9 +267,20 @@ class RIBasis(RIFunctions):
     def _resolve_cutoff(self, cutoff: Cutoff) -> float | None:
         if cutoff == CutoffType.NON_PERIODIC:
             return None
-        if cutoff == CutoffType.ESTIMATE:
+        elif cutoff == CutoffType.ESTIMATE:
             return self.radial_funcs.estimate_cutoff()
-        if isinstance(cutoff, (int, float)):
+        elif cutoff == CutoffType.FIRST_NEIGHBOURS:
+            if self.cell_vectors is None or abs(np.linalg.det(self.cell_vectors)) < 1e-12:
+                raise ValueError("Cell vectors required for FIRST_NEIGHBOURS cutoff.")
+
+            shifts = np.array(
+                [[i, j, k] for i in (-1, 0, 1)
+                 for j in (-1, 0, 1)
+                 for k in (-1, 0, 1)]
+            )
+            vectors = shifts @ self.cell_vectors
+            return float(np.max(np.linalg.norm(vectors, axis=1))) + 1e-10
+        elif isinstance(cutoff, (int, float)):
             return float(cutoff)
         raise TypeError(f"Invalid cutoff type: {type(cutoff)}")
 

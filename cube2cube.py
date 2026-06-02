@@ -133,7 +133,7 @@ def cube2cube(
     basis_set = load_basis_set(
         input_cube,
         str(basis_spec),
-        cutoff=CutoffType.NON_PERIODIC,
+        cutoff=CutoffType.FIRST_NEIGHBOURS,
         order_by_species=False
     )
 
