@@ -3,55 +3,31 @@ from typing import cast
 from salted_espresso.electronic_density.types import DensityFunction
 from salted_espresso.ri_basis.core import RIBasisSet
 
+from salted_espresso.projections.overlap_integrals import (
+    compute_overlap_matrix_overlap_metric,
+)
+
 from tqdm.auto import tqdm
 
-def compute_overlap_matrix(basis_set: RIBasisSet, print_progress_bar: bool = False) -> np.ndarray:
-    """Computeds the overlap matrix S_ij = <chi_i | chi_j> for the given density and basis set."""
-    cell_vectors = np.asarray(getattr(basis_set, "cell_vectors", None), dtype=float)
-    if cell_vectors.size == 0:
-        raise ValueError("basis_set must provide cell_vectors to compute the overlap matrix.")
+def compute_overlap_matrix(
+    basis_set: RIBasisSet,
+    metric: str = "overlap",
+    print_progress_bar: bool = False,
+) -> np.ndarray:
 
-    basis_probe = np.asarray(basis_set(np.zeros((1, 3), dtype=float)))
-    if basis_probe.ndim == 1:
-        n_basis = basis_probe.shape[0]
-    elif basis_probe.ndim == 2 and basis_probe.shape[0] == 1:
-        n_basis = basis_probe.shape[1]
-    else:
-        raise ValueError(
-            "basis_set(points) must return shape (1, n_basis) or (n_basis,) for a single point."
+    if metric == "overlap":
+        return compute_overlap_matrix_overlap_metric(
+            basis_set,
+            print_progress_bar=print_progress_bar,
         )
 
-    n_cartesian_grid = 64
-    nx = ny = nz = n_cartesian_grid
-
-    f1 = np.linspace(0, 1, nx, endpoint=False)
-    f2 = np.linspace(0, 1, ny, endpoint=False)
-    f3 = np.linspace(0, 1, nz, endpoint=False)
-    F1, F2, F3 = np.meshgrid(f1, f2, f3, indexing="ij")
-    frac_pts = np.stack((F1.ravel(), F2.ravel(), F3.ravel()), axis=-1)
-    points = frac_pts @ cell_vectors
-
-    dV = abs(np.linalg.det(cell_vectors)) / (nx * ny * nz)
-
-    overlap = np.zeros((n_basis, n_basis), dtype=np.complex128)
-    chunk_size = 10000
-
-    iterator = range(0, len(points), chunk_size)
-
-    if print_progress_bar:
-        iterator = tqdm(
-            iterator,
-            total=len(iterator),
-            desc="Evaluating Overlap Matrix S",
-            unit="matrix element chunk",
+    elif metric == "coulomb":
+        return compute_overlap_matrix_coulomb_metric(
+            basis_set,
+            print_progress_bar=print_progress_bar,
         )
 
-    for i in iterator:
-        chunk = points[i:i + chunk_size]
-        values = np.asarray(basis_set(chunk))
-        overlap += values.conj().T @ values * dV
-
-    return np.asarray(np.real_if_close(0.5 * (overlap + overlap.T.conj()), tol=1000))
+    raise ValueError(f"Unknown metric '{metric}'")
 
 
 def compute_projection_vector(
