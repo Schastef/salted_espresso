@@ -94,6 +94,7 @@ def cube2cube(
     input_cube: Path,
     basis_spec: Path,
     output_dir: Path,
+    mode: str = "coulomb",
     overwrite: bool = False,
 ) -> None:
     """
@@ -148,13 +149,13 @@ def cube2cube(
 
     # Step 4: Calculate overlap matrix
     print("Computing overlap matrix...")
-    overlap_matrix = compute_overlap_matrix(basis_set, print_progress_bar=True, metric="coulomb")
+    overlap_matrix = compute_overlap_matrix(basis_set, print_progress_bar=True, metric=mode)
     print(f"Overlap matrix shape: {overlap_matrix.shape}")
     print(f"Overlap matrix condition number: {np.linalg.cond(overlap_matrix):.2e}")
 
     # Step 5: Calculate projection vector using FFT grid
     print("Computing projection vector using FFT integration...")
-    projection_vector = compute_projection_vector(rho_original, basis_set, mode="fft", print_progress_bar=True)
+    projection_vector = compute_projection_vector(rho_original, basis_set, mode=mode, print_progress_bar=True)
     print(f"Projection vector shape: {projection_vector.shape}")
     print(f"Projection vector norm: {np.linalg.norm(projection_vector):.6e}")
 
@@ -239,6 +240,13 @@ def main():
         help="Path to directory where to store output"
     )
     parser.add_argument(
+        "--mode",
+        choices=("overlap", "coulomb"),
+        default="overlap",
+        help="Projection mode: 'overlap' uses FFT projection + overlap matrix; "
+             "'coulomb' uses Coulomb-metric projection + Coulomb overlap matrix.",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite output file if it exists"
@@ -250,9 +258,9 @@ def main():
         input_cube=args.input_cube,
         basis_spec=args.basis_spec,
         output_dir=args.output_dir,
+        mode=args.mode,
         overwrite=args.overwrite,
     )
-
 
 if __name__ == "__main__":
     main()

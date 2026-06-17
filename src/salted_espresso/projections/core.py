@@ -106,7 +106,7 @@ def compute_projection_vector(
             cell_grid=cell_grid,
         )
 
-    if mode == "fft":
+    if mode == "fft" or mode == "overlap":
         return compute_projection_vector_native_grid(
             rho=rho,
             basis_set=basis_set,
