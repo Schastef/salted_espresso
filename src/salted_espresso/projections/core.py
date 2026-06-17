@@ -10,7 +10,7 @@ from salted_espresso.projections.overlap_integrals import (
 
 from salted_espresso.projections.projection import (
      compute_projection_vector_cartesian_grid,
-     compute_projection_vector_fft_grid,
+     compute_projection_vector_native_grid,
      compute_projection_vector_coulomb_metric,
 )
 
@@ -107,7 +107,7 @@ def compute_projection_vector(
         )
 
     if mode == "fft":
-        return compute_projection_vector_fft_grid(
+        return compute_projection_vector_native_grid(
             rho=rho,
             basis_set=basis_set,
             print_progress_bar=print_progress_bar,

@@ -5,6 +5,19 @@ from tqdm import tqdm
 from salted_espresso.electronic_density.types import DensityFunction
 from salted_espresso.ri_basis.core import RIBasisSet
 
+
+def coulomb_kernel(g2: np.ndarray) -> np.ndarray:
+    """Return 4*pi/G² with the G=0 mode removed."""
+    g2 = np.asarray(g2, dtype=float)
+
+    kernel = np.zeros_like(g2, dtype=float)
+    mask = g2 > 0.0
+
+    kernel[mask] = 4.0 * np.pi / g2[mask]
+
+    return kernel
+
+
 def compute_projection_vector_cartesian_grid(
     rho: DensityFunction,
     basis_set: RIBasisSet,
@@ -68,7 +81,7 @@ def compute_projection_vector_cartesian_grid(
     return np.asarray(P, dtype=float)
 
 
-def compute_projection_vector_fft_grid(
+def compute_projection_vector_native_grid(
     rho: DensityFunction,
     basis_set: RIBasisSet,
     print_progress_bar: bool = False,
@@ -140,4 +153,52 @@ def compute_projection_vector_coulomb_metric(
     basis_set: RIBasisSet,
     print_progress_bar: bool = False,
 ) -> np.ndarray:
-    raise NotImplementedError
+    """Compute W_i = <chi_i | v_c | rho> in reciprocal space."""
+
+    g_vectors = rho.g_vectors
+    g2 = rho.g2
+    rho_g = rho.evaluate_fourier()
+
+    kernel = coulomb_kernel(g2)
+
+    origin = np.zeros((1, 3), dtype=float)
+    basis_probe = np.asarray(basis_set(origin))
+
+    if basis_probe.ndim == 1:
+        n_basis = basis_probe.shape[0]
+    elif basis_probe.ndim == 2 and basis_probe.shape[0] == 1:
+        n_basis = basis_probe.shape[1]
+    else:
+        raise ValueError(
+            "basis_set(points) must return shape (n_points, n_basis) or "
+            "(n_basis,) for a single point."
+        )
+
+    projection = np.zeros(n_basis, dtype=np.complex128)
+
+    chunk_size = 10_000
+    iterator = range(0, len(g_vectors), chunk_size)
+
+    if print_progress_bar:
+        iterator = tqdm(
+            iterator,
+            total=len(iterator),
+            desc="Evaluating Coulomb projection vector",
+            unit="G chunk",
+        )
+
+    for start in iterator:
+        stop = start + chunk_size
+
+        g_chunk = g_vectors[start:stop]
+        kernel_chunk = kernel[start:stop]
+        rho_g_chunk = rho_g[start:stop]
+
+        chi_g = np.asarray(
+            basis_set.evaluate_fourier(g_chunk),
+            dtype=np.complex128,
+        )
+
+        projection += chi_g.conj().T @ (kernel_chunk * rho_g_chunk)
+
+    return np.asarray(np.real_if_close(projection, tol=1000))

@@ -131,6 +131,17 @@ class PlaneWaveDensity:
         frac_pts = np.stack((F1.ravel(), F2.ravel(), F3.ravel()), axis=-1)
         return np.asarray(self.origin, dtype=float) + frac_pts @ np.asarray(self.cell_grid, dtype=float)
 
+    @property
+    def g_vectors(self) -> np.ndarray:
+        return self.G / self.rho_g.size
+
+    @property
+    def g2(self) -> np.ndarray:
+        return np.einsum("ij,ij->i", self.G, self.G)
+
+    def evaluate_fourier(self) -> np.ndarray:
+        return self.rho_g.reshape(-1)
+
     def integrate_against(self, func) -> float:
         if self.fft_data is None:
             raise ValueError("fft_data must be stored on the density object to integrate against a callable.")
