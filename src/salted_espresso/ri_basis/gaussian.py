@@ -58,6 +58,28 @@ class PrimitiveGaussianRadials(RadialFunctions):
         min_alpha = min(self.alphas.values())
         return np.sqrt(-np.log(threshold) / min_alpha)
 
+    def evaluate_bessel_transform(
+        self,
+        n: int,
+        l: int,
+        g_norm: np.ndarray,
+    ) -> np.ndarray:
+        """Evaluate I_n^l(G) = ∫ r² R_n^l(r) j_l(Gr) dr."""
+        g_norm = np.asarray(g_norm, dtype=float)
+
+        radial_idx = self.lexographic_to_running_index((n, l))
+        radial = self.radials[radial_idx]
+
+        alpha = radial.alpha
+        amplitude = radial.amplitude
+
+        prefactor = (
+            amplitude
+            * np.sqrt(np.pi)
+            / (2.0 ** (l + 2) * alpha ** (l + 1.5))
+        )
+
+        return prefactor * g_norm**l * np.exp(-g_norm**2 / (4.0 * alpha))
 
 
 class PrimitiveGaussian:

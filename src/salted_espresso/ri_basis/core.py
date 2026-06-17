@@ -163,7 +163,7 @@ class AngularFunctions(RIFunctions):
         m = idx - count
         return l, m - l
 
-    def evaluate_fourier_angular(g_vectors: np.ndarray, l: int) -> np.ndarray:
+    def evaluate_fourier_angular(self, g_vectors: np.ndarray, l: int) -> np.ndarray:
         raise NotImplementedError
 
 class RIBasis(RIFunctions):
@@ -259,7 +259,7 @@ class RIBasis(RIFunctions):
             dtype=np.complex128,
         )
 
-        phase = np.exp(-1j * (g_vectors @ self.origin))
+        phase = np.exp(1j * (g_vectors @ self.origin))
 
         for radial_idx, (n, l) in enumerate(self._nl_pairs):
             basis_start = self._basis_offsets[radial_idx]
@@ -268,7 +268,7 @@ class RIBasis(RIFunctions):
             radial_g = self.radial_funcs.evaluate_bessel_transform(n, l, g_norm)
             angular_g = self.angular_funcs.evaluate_fourier_angular(g_vectors, l)
 
-            prefactor = 4.0 * np.pi * (1j ** l)
+            prefactor = 4.0 * np.pi * ((-1j) ** l)
 
             values[:, basis_start:basis_end] = (
                     prefactor
