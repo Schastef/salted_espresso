@@ -5,6 +5,7 @@ from salted_espresso.ri_basis.core import RIBasisSet
 
 from salted_espresso.projections.overlap_integrals import (
     compute_overlap_matrix_overlap_metric,
+    compute_overlap_matrix_coulomb_metric,
 )
 
 from tqdm.auto import tqdm

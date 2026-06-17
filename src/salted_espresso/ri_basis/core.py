@@ -122,6 +122,14 @@ class RadialFunctions(RIFunctions):
             raise IndexError(f"Radial running index out of range: {idx}")
         return self._nl_pairs[idx]
 
+    def evaluate_bessel_transform(
+        self,
+        n: int,
+        l: int,
+        g_norm: np.ndarray,
+    ) -> np.ndarray:
+        raise NotImplementedError
+
 
 class AngularFunctions(RIFunctions):
     """Base class for all angular functions
@@ -155,6 +163,8 @@ class AngularFunctions(RIFunctions):
         m = idx - count
         return l, m - l
 
+    def evaluate_fourier_angular(g_vectors: np.ndarray, l: int) -> np.ndarray:
+        raise NotImplementedError
 
 class RIBasis(RIFunctions):
     """Class representing a basis for the resolution of the identity (RI).
@@ -238,6 +248,36 @@ class RIBasis(RIFunctions):
         
         return total_val
 
+
+    def evaluate_fourier(self, g_vectors: np.ndarray) -> np.ndarray:
+        g_vectors = np.asarray(g_vectors, dtype=float)
+
+        g_norm = np.linalg.norm(g_vectors, axis=1)
+
+        values = np.zeros(
+            (g_vectors.shape[0], self._basis_size),
+            dtype=np.complex128,
+        )
+
+        phase = np.exp(-1j * (g_vectors @ self.origin))
+
+        for radial_idx, (n, l) in enumerate(self._nl_pairs):
+            basis_start = self._basis_offsets[radial_idx]
+            basis_end = self._basis_offsets[radial_idx + 1]
+
+            radial_g = self.radial_funcs.evaluate_bessel_transform(n, l, g_norm)
+            angular_g = self.angular_funcs.evaluate_fourier_angular(g_vectors, l)
+
+            prefactor = 4.0 * np.pi * (1j ** l)
+
+            values[:, basis_start:basis_end] = (
+                    prefactor
+                    * phase[:, None]
+                    * radial_g[:, None]
+                    * angular_g
+            )
+
+        return values
 
     def __len__(self):
         return self._basis_size
@@ -390,6 +430,25 @@ class RIBasisSet():
 
     def __getitem__(self, item):
         return self.ribases[item]
+
+
+    def evaluate_fourier(self, g_vectors: np.ndarray) -> np.ndarray:
+        """Evaluate all RI basis functions in reciprocal space.
+
+        Returns
+        -------
+        np.ndarray
+            Shape (n_G, n_total_basis)
+        """
+        g_vectors = np.asarray(g_vectors, dtype=float)
+
+        if g_vectors.ndim != 2 or g_vectors.shape[1] != 3:
+            raise ValueError(
+                f"g_vectors must have shape (n_G, 3), got {g_vectors.shape}"
+            )
+
+        results = [ribasis.evaluate_fourier(g_vectors) for ribasis in self.ribases]
+        return np.hstack(results)
 
 
     def span(self, coefficients: np.ndarray) -> Callable[[np.ndarray], np.ndarray]:
