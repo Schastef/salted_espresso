@@ -16,6 +16,19 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
+
+### LFS
+The repo uses Large File Storage (LFS) for largest test data, like the `.cube` files. To pull these when cloning the repo,
+you need to install `git-lfs` and pull the data with it:
+
+```bash
+sudo apt update
+sudo apt install git-lfs
+git lfs install
+git lfs pull
+
+```
+
 ---
 
 
