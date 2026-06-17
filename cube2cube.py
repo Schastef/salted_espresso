@@ -46,7 +46,7 @@ from salted_espresso.electronic_density.cube2rho import (
     compute_rho_g,
 )
 from salted_espresso.projections.core import (
-    compute_projection_vector_FFT,
+    compute_projection_vector,
     compute_overlap_matrix,
     solve_projections_coeffs,
 )
@@ -148,13 +148,13 @@ def cube2cube(
 
     # Step 4: Calculate overlap matrix
     print("Computing overlap matrix...")
-    overlap_matrix = compute_overlap_matrix(basis_set, print_progress_bar=True)
+    overlap_matrix = compute_overlap_matrix(basis_set, print_progress_bar=True, metric="coulomb")
     print(f"Overlap matrix shape: {overlap_matrix.shape}")
     print(f"Overlap matrix condition number: {np.linalg.cond(overlap_matrix):.2e}")
 
     # Step 5: Calculate projection vector using FFT grid
     print("Computing projection vector using FFT integration...")
-    projection_vector = compute_projection_vector_FFT(rho_original, basis_set, print_progress_bar=True)
+    projection_vector = compute_projection_vector(rho_original, basis_set, mode="fft", print_progress_bar=True)
     print(f"Projection vector shape: {projection_vector.shape}")
     print(f"Projection vector norm: {np.linalg.norm(projection_vector):.6e}")
 

@@ -8,6 +8,12 @@ from salted_espresso.projections.overlap_integrals import (
     compute_overlap_matrix_coulomb_metric,
 )
 
+from salted_espresso.projections.projection import (
+     compute_projection_vector_cartesian_grid,
+     compute_projection_vector_fft_grid,
+     compute_projection_vector_coulomb_metric,
+)
+
 from tqdm.auto import tqdm
 
 def compute_overlap_matrix(
@@ -82,58 +88,39 @@ def compute_projection_vector(
     return np.asarray(P, dtype=float)
 
 
-def compute_projection_vector_FFT(
+def compute_projection_vector(
     rho: DensityFunction,
     basis_set: RIBasisSet,
+    mode: str = "fft",
+    n_cartesian_grid: int | tuple[int, int, int] | None = None,
+    cell_grid: np.ndarray | None = None,
     print_progress_bar: bool = False,
 ) -> np.ndarray:
-    """Compute P_i = <rho | chi_i> on the density object's native FFT quadrature grid."""
-    integrate_against = getattr(rho, "integrate_against", None)
-    if not callable(integrate_against):
-        raise ValueError(
-            "rho must provide an 'integrate_against(func)' method to use FFT-grid projections."
+    """Compute projection coefficients P_i = <rho | chi_i>."""
+
+    if mode == "cartesian":
+        return compute_projection_vector_cartesian_grid(
+            rho=rho,
+            basis_set=basis_set,
+            n_cartesian_grid=n_cartesian_grid,
+            cell_grid=cell_grid,
         )
 
-    origin = np.zeros((1, 3), dtype=float)
-    if hasattr(rho, "origin") and getattr(rho, "origin") is not None:
-        origin = np.asarray(getattr(rho, "origin"), dtype=float).reshape(1, 3)
-
-    basis_probe = np.asarray(basis_set(origin))
-    if basis_probe.ndim == 1:
-        n_basis = basis_probe.shape[0]
-    elif basis_probe.ndim == 2 and basis_probe.shape[0] == 1:
-        n_basis = basis_probe.shape[1]
-    else:
-        raise ValueError(
-            "basis_set(points) must return shape (n_points, n_basis) or (n_basis,) for a single point."
+    if mode == "fft":
+        return compute_projection_vector_fft_grid(
+            rho=rho,
+            basis_set=basis_set,
+            print_progress_bar=print_progress_bar,
         )
 
-    projections = np.empty(n_basis, dtype=float)
-
-    iterator = range(n_basis)
-
-    if print_progress_bar:
-        iterator = tqdm(
-            iterator,
-            total=n_basis,
-            desc="Evaluating <rho | chi_i> integrals",
-            unit="integral",
+    if mode == "coulomb":
+        return compute_projection_vector_coulomb_metric(
+            rho=rho,
+            basis_set=basis_set,
+            print_progress_bar=print_progress_bar,
         )
 
-    for basis_index in iterator:
-        def basis_component(points: np.ndarray, idx: int = basis_index) -> np.ndarray:
-            values = np.asarray(basis_set(points))
-            if values.ndim == 1:
-                # Single-point fallback path.
-                return np.array([values[idx]], dtype=float)
-            if values.ndim != 2:
-                raise ValueError("basis_set(points) returned an array with unsupported rank.")
-            return np.asarray(values[:, idx], dtype=float)
-
-        projections[basis_index] = float(cast(float, integrate_against(basis_component)))
-
-    return projections
-
+    raise ValueError(f"Unknown projection mode: {mode!r}")
 
 def solve_projections_coeffs(overlap_matrix: np.ndarray, projection_vector: np.ndarray) -> np.ndarray:
     """Solves the linear system S c = P to obtain the projection coefficients c_i."""
